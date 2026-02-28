@@ -31,8 +31,8 @@ def root():
 def departures(stop_id: str):
     return get_departures(stop_id)
 
-@app.get("/analytics/delays")
-def delay_stats():
+@app.get("/analytics/delays/by-line")
+def delay_by_lines():
     db = SessionLocal()
     try:
         results = (
@@ -52,6 +52,62 @@ def delay_stats():
                 "avg_delay_min": round(r.avg_delay, 2) if r.avg_delay else 0,
                 "total_trips": r.total_trips,
                 "delayed_trips": r.delayed_trips or 0,
+            }
+            for r in results
+        ]
+    finally:
+        db.close()
+
+@app.get("/analytics/worst-lines")
+def worst_lines():
+    db = SessionLocal()
+    try:
+        results = (
+            db.query(
+                Departure.line,
+                Departure.line_name,
+                func.avg(Departure.delay_min).label("avg_delay"),
+                func.count(Departure.id).label("total_trips"),
+                func.sum((Departure.delay_min > 1).cast(Integer)).label("delayed_trips"),
+            )
+            .group_by(Departure.line)
+            .having(func.count(Departure.id) > 5)  # ignore lines with tiny sample size
+            .order_by(func.avg(Departure.delay_min).desc())
+            .all()
+        )
+        return [
+            {
+                "line": r.line,
+                "lineName": r.line_name,
+                "avg_delay_min": round(r.avg_delay, 2) if r.avg_delay else 0,
+                "total_trips": r.total_trips,
+                "delayed_trips": r.delayed_trips or 0,
+                "on_time_pct": round((1 - (r.delayed_trips or 0) / r.total_trips) * 100, 1),
+            }
+            for r in results
+        ]
+    finally:
+        db.close()
+
+@app.get("/analytics/delays/by-hour")
+def delays_by_hour():
+    db = SessionLocal()
+    try:
+        results = (
+            db.query(
+                func.strftime("%H", Departure.scheduled, "+11 hours").label("hour"),
+                func.avg(Departure.delay_min).label("avg_delay"),
+                func.count(Departure.id).label("total_trips"),
+            )
+            .group_by(func.strftime("%H", Departure.scheduled, "+11 hours").label("hour"),)
+            .order_by(func.strftime("%H", Departure.scheduled, "+11 hours").label("hour"),)
+            .all()
+        )
+        return [
+            {
+                "hour": int(r.hour),
+                "avg_delay_min": round(r.avg_delay, 2) if r.avg_delay else 0,
+                "total_trips": r.total_trips,
             }
             for r in results
         ]
