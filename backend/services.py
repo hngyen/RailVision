@@ -3,9 +3,15 @@ import pandas as pd
 import math
 
 from datetime import datetime, timezone
-from .config import API_KEY, BASE_URL
-from .database import SessionLocal
-from .models import Departure
+
+try:
+    from .config import API_KEY, BASE_URL
+    from .database import SessionLocal
+    from .models import Departure
+except ImportError:
+    from config import API_KEY, BASE_URL
+    from database import SessionLocal
+    from models import Departure
 
 def get_departures(stop_id: str = "200060"):
     headers = {

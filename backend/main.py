@@ -1,14 +1,22 @@
 from fastapi import FastAPI
-from .database import engine
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi.middleware.cors import CORSMiddleware
-from .database import SessionLocal
 from sqlalchemy import func, Integer, or_
 
-from .services import get_departures
-from .config import API_KEY, BASE_URL
-from .models import Departure
-from . import models
+try:
+    from .database import engine, SessionLocal
+    from .models import Departure
+    from .services import get_departures
+    from .config import API_KEY, BASE_URL
+    from . import models
+except ImportError:
+    import models
+    from database import engine 
+    from models import Departure
+    from services import get_departures
+    from config import API_KEY, BASE_URL
+
+
 
 
 models.Base.metadata.create_all(bind=engine)
@@ -120,12 +128,7 @@ def delays_by_hour():
                 func.count(Departure.id).label("total_trips"),
             )
             .group_by(func.strftime("%H", Departure.scheduled, "+11 hours").label("hour"),)
-            .filter(or_(
-                Departure.line.like("T%"),
-                Departure.line.like("L%"),
-                Departure.line.like("M%"),
-                Departure.line.like("S%"),
-            ))
+            
             .order_by(func.strftime("%H", Departure.scheduled, "+11 hours").label("hour"),)
             .all()
         )
