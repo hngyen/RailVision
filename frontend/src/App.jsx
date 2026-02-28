@@ -36,7 +36,7 @@ function DelayBadge({ delay }) {
 }
 
 function DepartureBoard({ departures }) {
-        const now = new Date()
+        const now = new Date(new Date().toLocaleString("en-AU", { timeZone: "Australia/Sydney" }))
         return (
           <div style={{ background: "#0f0f0e", border: "1px solid #292524", padding: "1.5rem", marginBottom: "1.5rem" }}>
             <div style={{ color: "#78716c", fontSize: "0.7rem", letterSpacing: "0.15em", marginBottom: "1.25rem" }}>
@@ -60,7 +60,7 @@ function DepartureBoard({ departures }) {
               <span style={{ textAlign: "right" }}>STATUS</span>
             </div>
             {departures.slice(0, 12).map((dep, i) => {
-              const scheduled = new Date(dep.scheduled_dt)
+              const scheduled = new Date(new Date(dep.scheduled_dt).toLocaleString("en-AU", { timeZone: "Australia/Sydney" }))
               const estimated = dep.estimated_dt ? new Date(dep.estimated_dt) : null
               const delayMins = estimated ? Math.round((estimated - scheduled) / 60000) : 0
               const status = !dep.realtime ? "—" : delayMins <= 0 ? "ON TIME" : delayMins <= 2 ? `+${delayMins}m` : `+${delayMins}m`
@@ -100,9 +100,9 @@ export default function App() {
   useEffect(() => {
     const fetchData = () => {
       Promise.all([
-        fetch("http://localhost:8000/analytics/worst-lines").then(r => r.json()),
-        fetch("http://localhost:8000/analytics/delays/by-hour").then(r => r.json()),
-        fetch("http://localhost:8000/departures/live/200060").then(r => r.json()).then(setLiveDeps),
+        fetch("https://railvision-backend.onrender.com/analytics/worst-lines").then(r => r.json()),
+        fetch("https://railvision-backend.onrender.com/analytics/delays/by-hour").then(r => r.json()),
+        fetch("https://railvision-backend.onrender.com/departures/live/200060").then(r => r.json()).then(setLiveDeps),
       ]).then(([d, h]) => {
         setDelays(d)
         setByHour(h)
