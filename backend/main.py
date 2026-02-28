@@ -85,7 +85,7 @@ def worst_lines():
                 func.count(Departure.id).label("total_trips"),
                 func.sum((Departure.delay_min > 1).cast(Integer)).label("delayed_trips"),
             )
-            .group_by(Departure.line)
+            .group_by(Departure.line, Departure.line_name)
             .filter(or_(
                 Departure.line.like("T%"),
                 Departure.line.like("L%"),
