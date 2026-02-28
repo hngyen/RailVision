@@ -99,18 +99,18 @@ export default function App() {
   const [liveDeps, setLiveDeps] = useState([])
 
   useEffect(() => {
-    const fetchData = () => {
-      Promise.all([
-        fetch("https://railvision-backend.onrender.com/analytics/worst-lines").then(r => r.json()),
-        fetch("https://railvision-backend.onrender.com/analytics/delays/by-hour").then(r => r.json()),
-        fetch("https://railvision-backend.onrender.com/departures/live/200060").then(r => r.json()).then(setLiveDeps),
-      ]).then(([d, h]) => {
-        setDelays(d)
-        setByHour(h)
-        setLiveDeps(live)
-        setLoading(false)
-      })
-    }
+  const fetchData = () => {
+    Promise.all([
+      fetch("https://railvision-backend.onrender.com/analytics/worst-lines").then(r => r.json()),
+      fetch("https://railvision-backend.onrender.com/analytics/delays/by-hour").then(r => r.json()),
+      fetch("https://railvision-backend.onrender.com/departures/live/200060").then(r => r.json()),
+    ]).then(([d, h, live]) => {
+      setDelays(d)
+      setByHour(h)
+      setLiveDeps(live)
+      setLoading(false)
+    })
+  }
     fetchData() // run immediately
     const interval = setInterval(fetchData, 60000) // then every 60s
     return () => clearInterval(interval) // cleanup on unmount
