@@ -3,6 +3,10 @@ import pandas as pd
 import math
 
 from datetime import datetime, timezone
+import pytz
+
+sydney_tz = pytz.timezone("Australia/Sydney")
+now = datetime.now(sydney_tz)
 
 from config import API_KEY, BASE_URL
 from database import SessionLocal
@@ -12,7 +16,6 @@ def get_departures(stop_id: str = "200060"):
     headers = {
         "Authorization": f"apikey {API_KEY}"
     }
-    now = datetime.now()
     params = {
         "outputFormat": "rapidJSON",
         "coordOutputFormat": "EPSG:4326",
