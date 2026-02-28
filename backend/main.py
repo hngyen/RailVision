@@ -18,11 +18,14 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "https://railvision-frontend.vercel.app/",],
+    allow_origins=[
+        "http://localhost:5173",
+        "https://railvision-frontend.vercel.app",
+        "https://*.vercel.app",
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 # background polling job
 def poll_departures():
     print("Polling departures...")
