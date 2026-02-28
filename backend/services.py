@@ -5,17 +5,21 @@ import math
 from datetime import datetime, timezone
 import pytz
 
-sydney_tz = pytz.timezone("Australia/Sydney")
-now = datetime.now(sydney_tz)
 
 from config import API_KEY, BASE_URL
 from database import SessionLocal
 from models import Departure
 
+
 def get_departures(stop_id: str = "200060"):
     headers = {
         "Authorization": f"apikey {API_KEY}"
     }
+
+    sydney_tz = pytz.timezone("Australia/Sydney")
+    now = datetime.now(sydney_tz)
+    print(f"Fetching for date: {now.strftime('%Y%m%d')} time: {now.strftime('%H%M')}")
+
     params = {
         "outputFormat": "rapidJSON",
         "coordOutputFormat": "EPSG:4326",

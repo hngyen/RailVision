@@ -137,6 +137,6 @@ def delays_by_hour():
 
 @app.get("/departures/live/{stop_id}")
 def live_departures(stop_id: str):
-    deps = get_departures(stop_id)
+    deps = get_departures(stop_id) 
     filtered = [d for d in deps if str(d.get("line", "")).startswith(("T", "L", "M", "S"))]
     return sorted(filtered, key=lambda x: x.get("scheduled_dt", ""))

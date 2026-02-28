@@ -35,13 +35,16 @@ function DelayBadge({ delay }) {
   )
 }
 
-function DepartureBoard({ departures }) {
-  
+function DepartureBoard({ departures, tick }) {
   const upcoming = departures.filter(dep => {
-  const now = new Date()
+    const now = new Date()
     const scheduled = new Date(dep.scheduled_dt)
-    return (scheduled - now) / 60000 > -60  // keep anything up to 60 mins in the past
+    console.log("scheduled:", dep.scheduled_dt, "diff mins:", (scheduled - now) / 60000)
+    return (scheduled - now) / 60000 > -2
   })
+
+  console.log("upcoming:", upcoming.length, "total:", departures.length)
+
         return (
           <div style={{ background: "#0f0f0e", border: "1px solid #292524", padding: "1.5rem", marginBottom: "1.5rem" }}>
             <div style={{ color: "#78716c", fontSize: "0.7rem", letterSpacing: "0.15em", marginBottom: "1.25rem" }}>
@@ -65,8 +68,6 @@ function DepartureBoard({ departures }) {
               <span style={{ textAlign: "right" }}>STATUS</span>
             </div>
             {upcoming.slice(0, 12).map((dep, i) => {
-              const scheduled = new Date(dep.scheduled_dt)
-              const now = new Date()
               console.log("scheduled:", scheduled.toISOString(), "now:", now.toISOString(), "diff:", scheduled - now)
               const estimated = dep.estimated_dt ? new Date(dep.estimated_dt) : null
               const delayMins = estimated ? Math.round((estimated - scheduled) / 60000) : 0
