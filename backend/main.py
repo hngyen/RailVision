@@ -3,18 +3,11 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func, Integer, or_
 
-try:
-    from .database import engine, SessionLocal
-    from .models import Departure
-    from .services import get_departures
-    from .config import API_KEY, BASE_URL
-    from . import models
-except ImportError:
-    import models
-    from database import engine 
-    from models import Departure
-    from services import get_departures
-    from config import API_KEY, BASE_URL
+import models
+from database import engine, SessionLocal
+from models import Departure
+from services import get_departures
+from config import API_KEY, BASE_URL
 
 
 
