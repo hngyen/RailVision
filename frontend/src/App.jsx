@@ -68,7 +68,8 @@ function DepartureBoard({ departures, tick }) {
               <span style={{ textAlign: "right" }}>STATUS</span>
             </div>
             {upcoming.slice(0, 12).map((dep, i) => {
-              console.log("scheduled:", scheduled.toISOString(), "now:", now.toISOString(), "diff:", scheduled - now)
+              const now = new Date()
+              const scheduled = new Date(dep.scheduled_dt)
               const estimated = dep.estimated_dt ? new Date(dep.estimated_dt) : null
               const delayMins = estimated ? Math.round((estimated - scheduled) / 60000) : 0
               const status = !dep.realtime ? "—" : delayMins <= 0 ? "ON TIME" : delayMins <= 2 ? `+${delayMins}m` : `+${delayMins}m`
