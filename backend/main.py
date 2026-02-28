@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import func, Integer, or_
+from sqlalchemy import func, Integer, or_, cast
+from sqlalchemy.types import String
 
 import models
 from database import engine, SessionLocal
@@ -115,13 +116,18 @@ def delays_by_hour():
     try:
         results = (
             db.query(
-                func.strftime("%H", Departure.scheduled, "+11 hours").label("hour"),
+                func.to_char(func.cast(Departure.scheduled, String), 'HH24').label("hour"),
                 func.avg(Departure.delay_min).label("avg_delay"),
                 func.count(Departure.id).label("total_trips"),
             )
-            .group_by(func.strftime("%H", Departure.scheduled, "+11 hours").label("hour"),)
-            
-            .order_by(func.strftime("%H", Departure.scheduled, "+11 hours").label("hour"),)
+            .filter(or_(
+                Departure.line.like("T%"),
+                Departure.line.like("L%"),
+                Departure.line.like("M%"),
+                Departure.line.like("S%"),
+            ))
+            .group_by(func.to_char(func.cast(Departure.scheduled, String), 'HH24'))
+            .order_by(func.to_char(func.cast(Departure.scheduled, String), 'HH24'))
             .all()
         )
         return [

@@ -3,7 +3,7 @@ import pandas as pd
 import math
 
 from datetime import datetime, timezone
-from sqlalchemy.dialects.sqlite import insert
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 import pytz
 
 
@@ -85,25 +85,26 @@ def get_departures(stop_id: str = "200060"):
                 stop_id=stop_id,
                 fetched_at=fetched_at,
             )
-            stmt = insert(Departure).values(
-                line=row["line"],
-                line_name=row["lineName"],
-                destination=row["destination"],
-                operator=row["operator"],
-                platform=row["platform"],
-                scheduled=row["scheduled_dt"].isoformat(),
-                estimated=row["estimated_dt"].isoformat() if pd.notna(row["estimated_dt"]) else None,
-                delay_min=row["delay_min"] if pd.notna(row["delay_min"]) else None,
-                realtime=row["realtime"],
-                stop_id=stop_id,
-                fetched_at=fetched_at,
-            ).on_conflict_do_update(
-                index_elements=['line', 'scheduled', 'stop_id'],
-                set_={"estimated": row["estimated_dt"].isoformat() if pd.notna(row["estimated_dt"]) else None,
-                    "delay_min": row["delay_min"] if pd.notna(row["delay_min"]) else None,
-                    "fetched_at": fetched_at}
-            )
-            db.execute(stmt)
+
+        stmt = pg_insert(Departure).values(
+            line=row["line"],
+            line_name=row["lineName"],
+            destination=row["destination"],
+            operator=row["operator"],
+            platform=row["platform"],
+            scheduled=row["scheduled_dt"].isoformat(),
+            estimated=row["estimated_dt"].isoformat() if pd.notna(row["estimated_dt"]) else None,
+            delay_min=row["delay_min"] if pd.notna(row["delay_min"]) else None,
+            realtime=row["realtime"],
+            stop_id=stop_id,
+            fetched_at=fetched_at,
+        ).on_conflict_do_update(
+            constraint='unique_departure',
+            set_={"estimated": row["estimated_dt"].isoformat() if pd.notna(row["estimated_dt"]) else None,
+                "delay_min": row["delay_min"] if pd.notna(row["delay_min"]) else None,
+                "fetched_at": fetched_at}
+        )
+        db.execute(stmt)
         db.commit()
         print(f"Saved {len(df)} departures to DB")
     except Exception as e:
