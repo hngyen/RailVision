@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from .database import engine
 from apscheduler.schedulers.background import BackgroundScheduler
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func, Integer
 from .database import SessionLocal
 
@@ -13,6 +14,13 @@ from . import models
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # background polling job
 def poll_departures():
