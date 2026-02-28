@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, Float, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, Float, DateTime, UniqueConstraint
 from database import Base
 
 
@@ -17,3 +17,7 @@ class Departure(Base):
     realtime = Column(Boolean)
     stop_id = Column(String)
     fetched_at = Column(String)  # when pulled from the API
+
+    __table_args__ = (
+        UniqueConstraint('line', 'scheduled', 'stop_id', name='unique_departure'),
+    )
