@@ -12,7 +12,11 @@ if not DATABASE_URL:
     DATA_DIR.mkdir(exist_ok=True)
     DATABASE_URL = f"sqlite:///{DATA_DIR}/railvision.db"
 
-engine = create_engine(DATABASE_URL)
+if DATABASE_URL and DATABASE_URL.startswith("postgres"):
+    engine = create_engine(DATABASE_URL, connect_args={"sslmode": "require"})
+else:
+    engine = create_engine(DATABASE_URL)
+    
 SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
 
