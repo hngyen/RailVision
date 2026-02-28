@@ -92,7 +92,7 @@ def worst_lines():
                 Departure.line.like("M%"),
                 Departure.line.like("S%"),
             ))
-            .having(func.count(Departure.id) > 5)  # ignore lines with tiny sample size
+            .having(func.count(Departure.id) >= 1)  # ignore lines with tiny sample size
             .order_by(func.avg(Departure.delay_min).desc())
             .all()
         )
