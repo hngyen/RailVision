@@ -1,9 +1,9 @@
 from fastapi import FastAPI
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import func, Integer, or_, cast
+from sqlalchemy import func, Integer, or_, cast, text
 from sqlalchemy.types import String
-
+from sqlalchemy.types import TIMESTAMP
 import models
 from database import engine, SessionLocal
 from models import Departure
@@ -116,7 +116,7 @@ def delays_by_hour():
     try:
         results = (
             db.query(
-                func.to_char(func.cast(Departure.scheduled, String), 'HH24').label("hour"),
+                func.to_char(cast(Departure.scheduled, TIMESTAMP), 'HH24').label("hour"),
                 func.avg(Departure.delay_min).label("avg_delay"),
                 func.count(Departure.id).label("total_trips"),
             )
@@ -126,8 +126,8 @@ def delays_by_hour():
                 Departure.line.like("M%"),
                 Departure.line.like("S%"),
             ))
-            .group_by(func.to_char(func.cast(Departure.scheduled, String), 'HH24'))
-            .order_by(func.to_char(func.cast(Departure.scheduled, String), 'HH24'))
+            .group_by(func.to_char(cast(Departure.scheduled, TIMESTAMP), 'HH24'))
+            .order_by(func.to_char(cast(Departure.scheduled, TIMESTAMP), 'HH24'))
             .all()
         )
         return [
