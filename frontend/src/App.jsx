@@ -107,6 +107,7 @@ export default function App() {
       ]).then(([d, h]) => {
         setDelays(d)
         setByHour(h)
+        setLiveDeps(live)
         setLoading(false)
       })
     }
