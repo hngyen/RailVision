@@ -2,8 +2,8 @@ from fastapi import FastAPI
 from .database import engine
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import func, Integer
 from .database import SessionLocal
+from sqlalchemy import func, Integer, or_
 
 from .services import get_departures
 from .config import API_KEY, BASE_URL
@@ -51,6 +51,12 @@ def delay_by_lines():
                 func.sum((Departure.delay_min > 1).cast(Integer)).label("delayed_trips"),
             )
             .group_by(Departure.line)
+            .filter(or_(
+                Departure.line.like("T%"),
+                Departure.line.like("L%"),
+                Departure.line.like("M%"),
+                Departure.line.like("S%"),
+            ))
             .order_by(func.avg(Departure.delay_min).desc())
             .all()
         )
@@ -79,6 +85,12 @@ def worst_lines():
                 func.sum((Departure.delay_min > 1).cast(Integer)).label("delayed_trips"),
             )
             .group_by(Departure.line)
+            .filter(or_(
+                Departure.line.like("T%"),
+                Departure.line.like("L%"),
+                Departure.line.like("M%"),
+                Departure.line.like("S%"),
+            ))
             .having(func.count(Departure.id) > 5)  # ignore lines with tiny sample size
             .order_by(func.avg(Departure.delay_min).desc())
             .all()
@@ -108,6 +120,12 @@ def delays_by_hour():
                 func.count(Departure.id).label("total_trips"),
             )
             .group_by(func.strftime("%H", Departure.scheduled, "+11 hours").label("hour"),)
+            .filter(or_(
+                Departure.line.like("T%"),
+                Departure.line.like("L%"),
+                Departure.line.like("M%"),
+                Departure.line.like("S%"),
+            ))
             .order_by(func.strftime("%H", Departure.scheduled, "+11 hours").label("hour"),)
             .all()
         )
@@ -121,3 +139,9 @@ def delays_by_hour():
         ]
     finally:
         db.close()
+
+@app.get("/departures/live/{stop_id}")
+def live_departures(stop_id: str):
+    deps = get_departures(stop_id)
+    filtered = [d for d in deps if str(d.get("line", "")).startswith(("T", "L", "M", "S"))]
+    return sorted(filtered, key=lambda x: x.get("scheduled_dt", ""))

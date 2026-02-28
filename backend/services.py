@@ -7,7 +7,7 @@ from .config import API_KEY, BASE_URL
 from .database import SessionLocal
 from .models import Departure
 
-def get_departures(stop_id: str = "10111010"):
+def get_departures(stop_id: str = "200060"):
     headers = {
         "Authorization": f"apikey {API_KEY}"
     }
@@ -23,7 +23,7 @@ def get_departures(stop_id: str = "10111010"):
         "itdDate": now.strftime("%Y%m%d"),
         "itdTime": now.strftime("%H%M"),
         "mode": "direct",
-        "numberOfResultsDeparture": "40"
+        "numberOfResultsDeparture": "40",
     }
 
     # if unsuccessful response
@@ -94,6 +94,6 @@ def get_departures(stop_id: str = "10111010"):
         return val
 
     return [
-        {k: clean(v) for k, v in row.items()}
+        {k: clean(v.isoformat() if hasattr(v, 'isoformat') else v) for k, v in row.items()}
         for row in result.to_dict(orient="records")
     ]
