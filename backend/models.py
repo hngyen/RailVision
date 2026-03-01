@@ -20,4 +20,6 @@ class Departure(Base):
 
     __table_args__ = (
         UniqueConstraint('line', 'scheduled', 'stop_id', name='unique_departure'),
+        Index('idx_line_scheduled', 'line', 'scheduled'), # speed up queries with line
+        Index('idx_stop_scheduled', 'stop_id', 'scheduled'), # speed up queries by stop and time
     )
