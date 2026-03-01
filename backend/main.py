@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.responses import Response
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func, Integer, or_, cast, text
@@ -32,7 +33,7 @@ scheduler = BackgroundScheduler()
 scheduler.add_job(poll_departures, "interval", seconds=60)
 scheduler.start()
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def root():
     return {"message": "RailVision API is running"}
 
