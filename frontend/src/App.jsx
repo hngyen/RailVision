@@ -35,7 +35,7 @@ function DelayBadge({ delay }) {
   )
 }
 
-function DepartureBoard({ departures, tick }) {
+function DepartureBoard({ departures }) {
   const upcoming = departures.filter(dep => {
     const now = new Date()
     const scheduled = new Date(dep.scheduled_dt)
@@ -103,20 +103,14 @@ export default function App() {
   const [byHour, setByHour] = useState([])
   const [loading, setLoading] = useState(true)
   const [liveDeps, setLiveDeps] = useState([])
-  const [tick, setTick] = useState(0)
   const API = "http://localhost:8000"
-  console.log(delays)
 
-  useEffect(() => {
-  const interval = setInterval(() => setTick(t => t + 1), 30000)
-  
   const fetchData = () => {
     Promise.all([
       fetch(`${API}/analytics/worst-lines`).then(r => r.json()),
       fetch(`${API}/analytics/delays/by-hour`).then(r => r.json()),
       fetch(`${API}/departures/live/200060`).then(r => r.json()),
     ]).then(([d, h, live]) => {
-      console.log("delays:", d)
       setDelays(Array.isArray(d) ? d : [])
       setByHour(Array.isArray(h) ? h : [])
       setLiveDeps(Array.isArray(live) ? live : [])
@@ -124,18 +118,16 @@ export default function App() {
     })
   }
 
-  fetchData()
-  const refreshInterval = setInterval(fetchData, 60000)
-  return () => {
-    clearInterval(interval)
-    clearInterval(refreshInterval)
-  }
-}, [])
+  useEffect(() => {
+    fetchData()
+    const interval = setInterval(fetchData, 60000)
+    return () => clearInterval(interval)
+  }, [])
 
   const totalTrips = Array.isArray(delays) ? delays.reduce((s, l) => s + l.total_trips, 0) : 0
   const avgDelay = Array.isArray(delays) && delays.length ? (delays.reduce((s, l) => s + l.avg_delay_min, 0) / delays.length).toFixed(2) : 0
   const worstLine = Array.isArray(delays) && delays[0]?.line ? delays[0].line : "—"
-  
+
   return (
     <div style={{
       minHeight: "100vh",
@@ -159,7 +151,7 @@ export default function App() {
         </div>
       </div>
 
-      <DepartureBoard departures={liveDeps} tick={tick} />
+      <DepartureBoard departures={liveDeps} />
 
       {/* stat cards */}
       {!loading && (
