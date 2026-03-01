@@ -43,8 +43,6 @@ function DepartureBoard({ departures, tick }) {
     return (scheduled - now) / 60000 > -2
   })
 
-  console.log("upcoming:", upcoming.length, "total:", departures.length)
-
         return (
           <div style={{ background: "#0f0f0e", border: "1px solid #292524", padding: "1.5rem", marginBottom: "1.5rem" }}>
             <div style={{ color: "#78716c", fontSize: "0.7rem", letterSpacing: "0.15em", marginBottom: "1.25rem" }}>
@@ -106,29 +104,38 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [liveDeps, setLiveDeps] = useState([])
   const [tick, setTick] = useState(0)
+  const API = "http://localhost:8000"
+  console.log(delays)
 
   useEffect(() => {
   const interval = setInterval(() => setTick(t => t + 1), 30000)
+  
   const fetchData = () => {
     Promise.all([
-      fetch("https://railvision-backend.onrender.com/analytics/worst-lines").then(r => r.json()),
-      fetch("https://railvision-backend.onrender.com/analytics/delays/by-hour").then(r => r.json()),
-      fetch("https://railvision-backend.onrender.com/departures/live/200060").then(r => r.json()),
+      fetch(`${API}/analytics/worst-lines`).then(r => r.json()),
+      fetch(`${API}/analytics/delays/by-hour`).then(r => r.json()),
+      fetch(`${API}/departures/live/200060`).then(r => r.json()),
     ]).then(([d, h, live]) => {
-      setDelays(d)
-      setByHour(h)
-      setLiveDeps(live)
+      console.log("delays:", d)
+      setDelays(Array.isArray(d) ? d : [])
+      setByHour(Array.isArray(h) ? h : [])
+      setLiveDeps(Array.isArray(live) ? live : [])
       setLoading(false)
     })
   }
-    fetchData() // run immediately
-    return () => clearInterval(interval) // cleanup on unmount
-  }, [])
 
-  const totalTrips = delays.reduce((s, l) => s + l.total_trips, 0)
-  const avgDelay = delays.length ? (delays.reduce((s, l) => s + l.avg_delay_min, 0) / delays.length).toFixed(2) : 0
-  const worstLine = delays[0]?.line ?? "—"
+  fetchData()
+  const refreshInterval = setInterval(fetchData, 60000)
+  return () => {
+    clearInterval(interval)
+    clearInterval(refreshInterval)
+  }
+}, [])
 
+  const totalTrips = Array.isArray(delays) ? delays.reduce((s, l) => s + l.total_trips, 0) : 0
+  const avgDelay = Array.isArray(delays) && delays.length ? (delays.reduce((s, l) => s + l.avg_delay_min, 0) / delays.length).toFixed(2) : 0
+  const worstLine = Array.isArray(delays) && delays[0]?.line ? delays[0].line : "—"
+  
   return (
     <div style={{
       minHeight: "100vh",

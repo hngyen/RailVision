@@ -58,7 +58,7 @@ def delay_by_lines():
                 Departure.line.like("M%"),
                 Departure.line.like("S%"),
             ))
-            .order_by(func.avg(Departure.delay_min).desc())
+            .order_by(func.avg(Departure.delay_min).desc().nullslast())
             .all()
         )
         return [
@@ -93,7 +93,7 @@ def worst_lines():
                 Departure.line.like("S%"),
             ))
             .having(func.count(Departure.id) >= 1)  # ignore lines with tiny sample size
-            .order_by(func.avg(Departure.delay_min).desc())
+            .order_by(func.avg(Departure.delay_min).desc().nullslast())
             .all()
         )
         return [
@@ -114,9 +114,19 @@ def worst_lines():
 def delays_by_hour():
     db = SessionLocal()
     try:
+        is_postgres = "postgresql" in str(engine.url)
+        
+        if is_postgres:
+            hour_expr = func.to_char(
+                cast(Departure.scheduled, TIMESTAMP) + text("interval '11 hours'"),
+                'HH24'
+            )
+        else:
+            hour_expr = func.strftime('%H', Departure.scheduled, '+11 hours')
+        
         results = (
             db.query(
-                func.to_char(cast(Departure.scheduled, TIMESTAMP), 'HH24').label("hour"),
+                hour_expr.label("hour"),
                 func.avg(Departure.delay_min).label("avg_delay"),
                 func.count(Departure.id).label("total_trips"),
             )
@@ -126,8 +136,8 @@ def delays_by_hour():
                 Departure.line.like("M%"),
                 Departure.line.like("S%"),
             ))
-            .group_by(func.to_char(cast(Departure.scheduled, TIMESTAMP), 'HH24'))
-            .order_by(func.to_char(cast(Departure.scheduled, TIMESTAMP), 'HH24'))
+            .group_by(hour_expr)
+            .order_by(hour_expr)
             .all()
         )
         return [
