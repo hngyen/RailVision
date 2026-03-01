@@ -20,7 +20,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["railvision-frontend.vercel.app"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
