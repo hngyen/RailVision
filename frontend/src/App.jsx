@@ -103,9 +103,10 @@ export default function App() {
   const [byHour, setByHour] = useState([])
   const [loading, setLoading] = useState(true)
   const [liveDeps, setLiveDeps] = useState([])
-  const API = "http://localhost:8000"
+  const API = "https://railvision-backend.onrender.com"
 
   const fetchData = () => {
+    console.log("fetching data...", new Date().toLocaleTimeString())
     Promise.all([
       fetch(`${API}/analytics/worst-lines`).then(r => r.json()),
       fetch(`${API}/analytics/delays/by-hour`).then(r => r.json()),
