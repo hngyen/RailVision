@@ -30,12 +30,38 @@ app.add_middleware(
 )
 
 STATIONS = {
+    "Cabramatta": "216620",
+    "Liverpool": "217010",
     "Central": "200060",
     "Town Hall": "200070",
-    "Parramatta": "215020",
-    "Strathfield": "213510",
     "Redfern": "201510",
-    "Cabramatta": "216620"
+    "Parramatta": "215020",
+    "Wynyard": "200080",
+    "Strathfield": "213510",
+    "Martin Place": "200090",
+    "Chatswood": "206710",
+    "Circular Quay": "200010",
+    "Bondi Junction": "202220",
+    "Burwood": "213410",
+    "Gadigal": "2000434",
+    "North Sydney": "206010",
+    "Hurstville": "222010",
+    "Wolli Creek": "220510",
+    "Blacktown": "214810",
+    "Epping": "212110",
+    "Mascot": "202010",
+    "Green Square": "201710",
+    "Victoria Cross": "2060444",
+    "Ashfield": "213110",
+    "Seven Hills": "214710",
+    "Sydenham": "204410",
+    "Lidcombe": "214110",
+    "Museum": "200040",
+    "St James": "200050",
+    "Kings Cross": "201110",
+    "Hornsby": "207710",
+    "Rhodes": "213810",
+    "Auburn": "214410"
 }
 
 # background polling job
@@ -203,5 +229,49 @@ def delays_by_day_hour(stop_id: Optional[str] = None):
             }
             for r in results
         ]
+    finally:
+        db.close()
+
+@app.get("/analytics/stations/summary")
+def stations_summary():
+    db = SessionLocal()
+    try:
+        results = (
+            db.query(
+                Departure.stop_id,
+                func.avg(Departure.delay_min).label("avg_delay"),
+                func.count(Departure.id).label("total_trips"),
+            )
+            .filter(Departure.line.op('~')('^[TLMS][0-9]$'))
+            .group_by(Departure.stop_id)
+            .all()
+        )
+
+        # worst line per station
+        worst = (
+            db.query(
+                Departure.stop_id,
+                Departure.line,
+                func.avg(Departure.delay_min).label("avg_delay"),
+            )
+            .filter(Departure.line.op('~')('^[TLMS][0-9]$'))
+            .group_by(Departure.stop_id, Departure.line)
+            .order_by(Departure.stop_id, func.avg(Departure.delay_min).desc())
+            .all()
+        )
+
+        worst_by_station = {}
+        for r in worst:
+            if r.stop_id not in worst_by_station:
+                worst_by_station[r.stop_id] = r.line
+
+        return {
+            r.stop_id: {
+                "avg_delay": round(r.avg_delay, 2) if r.avg_delay else 0,
+                "total_trips": r.total_trips,
+                "worst_line": worst_by_station.get(r.stop_id)
+            }
+            for r in results
+        }
     finally:
         db.close()

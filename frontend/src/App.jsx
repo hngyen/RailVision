@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts"
+import Heatmap from "./Heatmap"
+import StationMap from "./StationMap"
 
 const ACCENT = "#a78bfa"      // violet
 const ACCENT_DIM = "#3b1f6e"  // dark purple
@@ -10,7 +12,12 @@ const STATIONS = [
   { name: "Parramatta", id: "215020" },
   { name: "Strathfield", id: "213510" },
   { name: "Redfern", id: "201510" },
-  { name: "Cabramatta", id: "216620" }
+  { name: "Cabramatta", id: "216620" },
+  { name: "Wynyard", id: "200080" },
+  { name: "Chatswood", id: "206710" },
+  { name: "Hornsby", id: "207710" },
+  { name: "Auburn", id: "214410" },
+  { name: "Lidcombe", id: "214110" }
 ]
 
 function StatCard({ label, value, sub }) {
@@ -115,6 +122,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [byDayHour, setByDayHour] = useState(true);
   const [liveDeps, setLiveDeps] = useState([]);
+  const [stationStats, setStationStats] = useState({})
   const [activeTab, setActiveTab] = useState("overview")
   const tabs = ["overview", "analytics", "map"]
   const API = "https://railvision-backend.onrender.com";
@@ -126,20 +134,22 @@ export default function App() {
         fetch(`${API}/analytics/delays/by-hour?stop_id=${selectedStation.id}`).then(r => r.json()),
         fetch(`${API}/departures/live/${selectedStation.id}`).then(r => r.json()),
         fetch(`${API}/analytics/delays/by-day-hour?stop_id=${selectedStation.id}`).then(r => r.json()),
-      ]).then(([d, h, live]) => {
-        setDelays(Array.isArray(d) ? d : []);
-        setByHour(Array.isArray(h) ? h : []);
-        setLiveDeps(Array.isArray(live) ? live : []);
+        fetch(`${API}/analytics/stations/summary`).then(r => r.json()),
+      ]).then(([d, h, live, dayHour, stats]) => {
+        setDelays(Array.isArray(d) ? d : [])
+        setByHour(Array.isArray(h) ? h : [])
+        setLiveDeps(Array.isArray(live) ? live : [])
         setByDayHour(Array.isArray(dayHour) ? dayHour : [])
-        setLoading(false);
+        setStationStats(stats || {})
+        setLoading(false)
       })
     }
 
   useEffect(() => {
-      fetchData();
-      const interval = setInterval(fetchData, 60000);
-      return () => clearInterval(interval);
-    }, [selectedStation])
+    fetchData();
+    const interval = setInterval(fetchData, 60000);
+    return () => clearInterval(interval);
+  }, [selectedStation])
     
   const totalTrips = Array.isArray(delays) ? delays.reduce((s, l) => s + l.total_trips, 0) : 0
   const avgDelay = Array.isArray(delays) && delays.length ? (delays.reduce((s, l) => s + l.avg_delay_min, 0) / delays.length).toFixed(2) : 0
@@ -185,7 +195,7 @@ export default function App() {
           </div>
         </div>
       
-      {/* TAB BAR */}
+      {/* tab bar */}
       <div style={{ display: "flex", gap: "0", marginBottom: "2rem", borderBottom: `1px solid ${ACCENT_DIM}` }}>
         {tabs.map(tab => (
           <button
@@ -260,32 +270,34 @@ export default function App() {
 
     {activeTab === "analytics" && (
       <div>
-      {/* chart */}
-          <div style={{ background: "#0f0f0e", border: "1px solid #292524", padding: "1.5rem", marginBottom: "1.5rem" }}>
-            <div style={{ color: "#a78bfa", fontSize: "1.6rem", letterSpacing: "0.15em", marginBottom: "1.25rem" }}>
-              ▸ AVG DELAY BY HOUR (SYDNEY LOCAL TIME)
-            </div>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={byHour} barCategoryGap="30%">
-                <CartesianGrid strokeDasharray="2 4" stroke="#cdbdd4" vertical={false} />
-                <XAxis dataKey="hour" stroke="#a78bfa" tick={{ fill: "#733dd6", fontSize: 18 }} tickFormatter={h => `${h}:00`} />
-                <YAxis stroke="#57534e" tick={{ fill: "#733dd6", fontSize: 11 }} unit="m" width={35} />
-                <Tooltip
-                  contentStyle={{ background: "#0a0a09", border: `1px solid ${ACCENT_DIM}`, borderRadius: 0, fontFamily: "monospace", fontSize: "0.75rem" }}
-                  formatter={val => [`${val} min`, "Avg Delay"]}
-                  labelFormatter={h => `${h}:00`}
-                  cursor={{ fill: "#1c1917" }}
-                />
-                <Bar dataKey="avg_delay_min" fill={ACCENT} radius={0} />
-              </BarChart>
-            </ResponsiveContainer>
+        <div style={{ background: "#0f0f0e", border: "1px solid #292524", padding: "1.5rem", marginBottom: "1.5rem" }}>
+          <div style={{ color: "#a78bfa", fontSize: "1.6rem", letterSpacing: "0.15em", marginBottom: "1.25rem" }}>
+            ▸ AVG DELAY BY HOUR (SYDNEY LOCAL TIME)
           </div>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={byHour} barCategoryGap="30%">
+              <CartesianGrid strokeDasharray="2 4" stroke="#cdbdd4" vertical={false} />
+              <XAxis dataKey="hour" stroke="#a78bfa" tick={{ fill: "#733dd6", fontSize: 18 }} tickFormatter={h => `${h}:00`} />
+              <YAxis stroke="#57534e" tick={{ fill: "#733dd6", fontSize: 11 }} unit="m" width={35} />
+              <Tooltip
+                contentStyle={{ background: "#0a0a09", border: `1px solid ${ACCENT_DIM}`, borderRadius: 0, fontFamily: "monospace", fontSize: "0.75rem" }}
+                formatter={val => [`${val} min`, "Avg Delay"]}
+                labelFormatter={h => `${h}:00`}
+                cursor={{ fill: "#1c1917" }}
+              />
+              <Bar dataKey="avg_delay_min" fill={ACCENT} radius={0} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <div style={{ background: "#0f0f0e", border: "1px solid #292524", padding: "1.5rem", marginTop: "1.5rem" }}>
+          <Heatmap data={byDayHour} />
+        </div>
       </div>
     )}
 
     {activeTab === "map" && (
-      <div>
-        {/* geospatial map goes here */}
+      <div style={{ display: activeTab === "map" ? "block" : "none" }}>
+        <StationMap stationStats={stationStats} />
       </div>
     )}
 
