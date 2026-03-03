@@ -78,8 +78,8 @@ function DepartureBoard({ departures }) {
               const now = new Date()
               const scheduled = new Date(dep.scheduled_dt)
               const estimated = dep.estimated_dt ? new Date(dep.estimated_dt) : null
-              const delayMins = estimated ? Math.round((estimated - scheduled) / 60000) : 0
-              const status = !dep.realtime ? "—" : delayMins <= 0 ? "ON TIME" : delayMins <= 2 ? `+${delayMins}m` : `+${delayMins}m`
+              const delayMins = estimated ? Math.round((estimated - scheduled) / 60000) : null
+              const status = !dep.realtime ? "—" : delayMins === null ? "—" : delayMins <= 0 ? "ON TIME" : `+${delayMins}m`
               const statusColor = !dep.realtime ? "#57534e" : delayMins <= 0 ? "#22c55e" : delayMins <= 2 ? "#eab308" : "#ef4444"
               const minsUntil = Math.round((scheduled - now) / 60000)
 
@@ -114,6 +114,8 @@ export default function App() {
   const [byHour, setByHour] = useState([]);
   const [loading, setLoading] = useState(true);
   const [liveDeps, setLiveDeps] = useState([]);
+  const [activeTab, setActiveTab] = useState("overview")
+  const tabs = ["overview", "analytics", "map"]
   const API = "https://railvision-backend.onrender.com";
 
   const fetchData = () => {
@@ -154,15 +156,13 @@ export default function App() {
               LIVE DATA — UPDATES EVERY 60S
             </div>
           </div>
-
-          {/* dropdown */}
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.5rem" }}>
             <label style={{ color: "#57534e", fontSize: "0.6rem", letterSpacing: "0.1em" }}>SELECT TERMINAL</label>
-            <select 
+            <select
               value={selectedStation.id}
               onChange={(e) => {
-                  const station = STATIONS.find(s => s.id === e.target.value);
-                  setSelectedStation(station);
+                const station = STATIONS.find(s => s.id === e.target.value)
+                setSelectedStation(station)
               }}
               style={{
                 background: "#0f0f0e",
@@ -181,7 +181,36 @@ export default function App() {
             </select>
           </div>
         </div>
+      
+      {/* TAB BAR */}
+      <div style={{ display: "flex", gap: "0", marginBottom: "2rem", borderBottom: `1px solid ${ACCENT_DIM}` }}>
+        {tabs.map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            style={{
+              background: "none",
+              border: "none",
+              borderBottom: activeTab === tab ? `2px solid ${ACCENT}` : "2px solid transparent",
+              color: activeTab === tab ? ACCENT : "#57534e",
+              padding: "0.75rem 1.5rem",
+              fontFamily: "monospace",
+              fontSize: "0.8rem",
+              letterSpacing: "0.15em",
+              textTransform: "uppercase",
+              cursor: "pointer",
+              marginBottom: "-1px"
+            }}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
 
+      {activeTab === "overview" && (
+      <div>
+
+      {/* departures */}
       <DepartureBoard departures={liveDeps} />
 
       {/* stat cards */}
@@ -193,27 +222,6 @@ export default function App() {
           <StatCard label="Lines Tracked" value={delays.length} />
         </div>
       )}
-
-      {/* chart */}
-      <div style={{ background: "#0f0f0e", border: "1px solid #292524", padding: "1.5rem", marginBottom: "1.5rem" }}>
-        <div style={{ color: "#a78bfa", fontSize: "1.6rem", letterSpacing: "0.15em", marginBottom: "1.25rem" }}>
-          ▸ AVG DELAY BY HOUR (SYDNEY LOCAL TIME)
-        </div>
-        <ResponsiveContainer width="100%" height={220}>
-          <BarChart data={byHour} barCategoryGap="30%">
-            <CartesianGrid strokeDasharray="2 4" stroke="#cdbdd4" vertical={false} />
-            <XAxis dataKey="hour" stroke="#a78bfa" tick={{ fill: "#733dd6", fontSize: 18 }} tickFormatter={h => `${h}:00`} />
-            <YAxis stroke="#57534e" tick={{ fill: "#733dd6", fontSize: 11 }} unit="m" width={35} />
-            <Tooltip
-              contentStyle={{ background: "#0a0a09", border: `1px solid ${ACCENT_DIM}`, borderRadius: 0, fontFamily: "monospace", fontSize: "0.75rem" }}
-              formatter={val => [`${val} min`, "Avg Delay"]}
-              labelFormatter={h => `${h}:00`}
-              cursor={{ fill: "#1c1917" }}
-            />
-            <Bar dataKey="avg_delay_min" fill={ACCENT} radius={0} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
 
       {/* lines table */}
       <div style={{ background: "#0f0f0e", border: "1px solid #292524", padding: "1.5rem" }}>
@@ -243,6 +251,40 @@ export default function App() {
           </div>
         ))}
       </div>
+
+      </div>
+    )}
+
+    {activeTab === "analytics" && (
+      <div>
+      {/* chart */}
+          <div style={{ background: "#0f0f0e", border: "1px solid #292524", padding: "1.5rem", marginBottom: "1.5rem" }}>
+            <div style={{ color: "#a78bfa", fontSize: "1.6rem", letterSpacing: "0.15em", marginBottom: "1.25rem" }}>
+              ▸ AVG DELAY BY HOUR (SYDNEY LOCAL TIME)
+            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={byHour} barCategoryGap="30%">
+                <CartesianGrid strokeDasharray="2 4" stroke="#cdbdd4" vertical={false} />
+                <XAxis dataKey="hour" stroke="#a78bfa" tick={{ fill: "#733dd6", fontSize: 18 }} tickFormatter={h => `${h}:00`} />
+                <YAxis stroke="#57534e" tick={{ fill: "#733dd6", fontSize: 11 }} unit="m" width={35} />
+                <Tooltip
+                  contentStyle={{ background: "#0a0a09", border: `1px solid ${ACCENT_DIM}`, borderRadius: 0, fontFamily: "monospace", fontSize: "0.75rem" }}
+                  formatter={val => [`${val} min`, "Avg Delay"]}
+                  labelFormatter={h => `${h}:00`}
+                  cursor={{ fill: "#1c1917" }}
+                />
+                <Bar dataKey="avg_delay_min" fill={ACCENT} radius={0} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+      </div>
+    )}
+
+    {activeTab === "map" && (
+      <div>
+        {/* geospatial map goes here */}
+      </div>
+    )}
 
       <div style={{ color: "#44403c", fontSize: "0.65rem", marginTop: "1.5rem", letterSpacing: "0.08em" }}>
         DATA SOURCE: TRANSPORT FOR NSW OPEN DATA // POLLING INTERVAL 60S
