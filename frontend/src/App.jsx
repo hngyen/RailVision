@@ -113,6 +113,7 @@ export default function App() {
   const [delays, setDelays] = useState([]);
   const [byHour, setByHour] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [byDayHour, setByDayHour] = useState(true);
   const [liveDeps, setLiveDeps] = useState([]);
   const [activeTab, setActiveTab] = useState("overview")
   const tabs = ["overview", "analytics", "map"]
@@ -124,10 +125,12 @@ export default function App() {
         fetch(`${API}/analytics/worst-lines?stop_id=${selectedStation.id}`).then(r => r.json()),
         fetch(`${API}/analytics/delays/by-hour?stop_id=${selectedStation.id}`).then(r => r.json()),
         fetch(`${API}/departures/live/${selectedStation.id}`).then(r => r.json()),
+        fetch(`${API}/analytics/delays/by-day-hour?stop_id=${selectedStation.id}`).then(r => r.json()),
       ]).then(([d, h, live]) => {
         setDelays(Array.isArray(d) ? d : []);
         setByHour(Array.isArray(h) ? h : []);
         setLiveDeps(Array.isArray(live) ? live : []);
+        setByDayHour(Array.isArray(dayHour) ? dayHour : [])
         setLoading(false);
       })
     }

@@ -161,3 +161,47 @@ def live_departures(stop_id: str):
     deps = get_departures(stop_id)
     filtered = [d for d in deps if re.match(r'^[TLMS]\d$', str(d.get("line", "")))]
     return sorted(filtered, key=lambda x: x.get("scheduled_dt", ""))
+
+@app.get("/analytics/delays/by-day-hour")
+def delays_by_day_hour(stop_id: Optional[str] = None):
+    db = SessionLocal()
+    try:
+        is_postgres = "postgresql" in str(engine.url)
+        
+        if is_postgres:
+            hour_expr = func.to_char(
+                cast(Departure.scheduled, TIMESTAMP) + text("interval '11 hours'"),
+                'HH24'
+            )
+            day_expr = func.to_char(
+                cast(Departure.scheduled, TIMESTAMP) + text("interval '11 hours'"),
+                'D'
+            )
+        else:
+            hour_expr = func.strftime('%H', Departure.scheduled, '+11 hours')
+            day_expr = func.strftime('%w', Departure.scheduled, '+11 hours')
+
+        query = (
+            db.query(
+                day_expr.label("day"),
+                hour_expr.label("hour"),
+                func.avg(Departure.delay_min).label("avg_delay"),
+                func.count(Departure.id).label("total_trips"),
+            )
+            .filter(Departure.line.op('~')('^[TLMS][0-9]$'))
+        )
+        if stop_id:
+            query = query.filter(Departure.stop_id == stop_id)
+
+        results = query.group_by(day_expr, hour_expr).order_by(day_expr, hour_expr).all()
+        return [
+            {
+                "day": int(r.day),
+                "hour": int(r.hour),
+                "avg_delay_min": round(r.avg_delay, 2) if r.avg_delay else 0,
+                "total_trips": r.total_trips,
+            }
+            for r in results
+        ]
+    finally:
+        db.close()
