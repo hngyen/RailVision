@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.responses import Response
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import func, Integer, or_, cast, text, regexp_match
+from sqlalchemy import func, Integer, or_, cast, text
 from sqlalchemy.types import String
 from sqlalchemy.types import TIMESTAMP
 import models
