@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.responses import Response
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import func, Integer, or_, cast, text
+from sqlalchemy import func, Integer, or_, cast, text, regexp_match
 from sqlalchemy.types import String
 from sqlalchemy.types import TIMESTAMP
 import models
@@ -10,9 +10,8 @@ from database import engine, SessionLocal
 from models import Departure
 from services import get_departures
 from config import API_KEY, BASE_URL
-
-
-
+from typing import Optional
+import re
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -20,14 +19,24 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["railvision-frontend.vercel.app"],
+    allow_origins=["railvision-frontend.vercel.app", "http://localhost:5173/"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+STATIONS = {
+    "Central": "200060",
+    "Town Hall": "200070",
+    "Parramatta": "215020",
+    "Strathfield": "213510",
+    "Redfern": "201510",
+    "Cabramatta": "216620"
+}
+
 # background polling job
 def poll_departures():
-    print("Polling departures...")
-    get_departures("200060")  # Central, add more stops later
+    for name, stop_id in STATIONS.items():
+        get_departures(stop_id)
 
 scheduler = BackgroundScheduler()
 scheduler.add_job(poll_departures, "interval", seconds=60)
@@ -42,26 +51,25 @@ def departures(stop_id: str):
     return get_departures(stop_id)
 
 @app.get("/analytics/delays/by-line")
-def delay_by_lines():
+def delay_by_lines(stop_id: Optional[str] = None):
     db = SessionLocal()
     try:
+        query = db.query(
+            Departure.line,
+            func.avg(Departure.delay_min).label("avg_delay"),
+            func.count(Departure.id).label("total_trips"),
+            func.sum((Departure.delay_min > 1).cast(Integer)).label("delayed_trips"),
+        ).filter(Departure.line.op('~')('^[TLMS][0-9]$'))
+
+        if stop_id:
+            query = query.filter(Departure.stop_id == stop_id)
+
         results = (
-            db.query(
-                Departure.line,
-                func.avg(Departure.delay_min).label("avg_delay"),
-                func.count(Departure.id).label("total_trips"),
-                func.sum((Departure.delay_min > 1).cast(Integer)).label("delayed_trips"),
-            )
-            .group_by(Departure.line)
-            .filter(or_(
-                Departure.line.like("T%"),
-                Departure.line.like("L%"),
-                Departure.line.like("M%"),
-                Departure.line.like("S%"),
-            ))
+            query.group_by(Departure.line)
             .order_by(func.avg(Departure.delay_min).desc().nullslast())
             .all()
         )
+
         return [
             {
                 "line": r.line,
@@ -75,10 +83,10 @@ def delay_by_lines():
         db.close()
 
 @app.get("/analytics/worst-lines")
-def worst_lines():
+def worst_lines(stop_id: Optional[str] = None):
     db = SessionLocal()
     try:
-        results = (
+        query = (
             db.query(
                 Departure.line,
                 Departure.line_name,
@@ -87,16 +95,12 @@ def worst_lines():
                 func.sum((Departure.delay_min > 1).cast(Integer)).label("delayed_trips"),
             )
             .group_by(Departure.line, Departure.line_name)
-            .filter(or_(
-                Departure.line.like("T%"),
-                Departure.line.like("L%"),
-                Departure.line.like("M%"),
-                Departure.line.like("S%"),
-            ))
-            .having(func.count(Departure.id) >= 1)  # ignore lines with tiny sample size
-            .order_by(func.avg(Departure.delay_min).desc().nullslast())
-            .all()
+            .filter(Departure.line.op('~')('^[TLMS][0-9]$'))
         )
+        if stop_id:
+            query = query.filter(Departure.stop_id == stop_id)
+        
+        results = query.having(func.count(Departure.id) >= 1).order_by(func.avg(Departure.delay_min).desc().nullslast()).all()
         return [
             {
                 "line": r.line,
@@ -112,11 +116,10 @@ def worst_lines():
         db.close()
 
 @app.get("/analytics/delays/by-hour")
-def delays_by_hour():
+def delays_by_hour(stop_id: Optional[str] = None):
     db = SessionLocal()
     try:
         is_postgres = "postgresql" in str(engine.url)
-        
         if is_postgres:
             hour_expr = func.to_char(
                 cast(Departure.scheduled, TIMESTAMP) + text("interval '11 hours'"),
@@ -124,23 +127,19 @@ def delays_by_hour():
             )
         else:
             hour_expr = func.strftime('%H', Departure.scheduled, '+11 hours')
-        
-        results = (
+
+        query = (
             db.query(
                 hour_expr.label("hour"),
                 func.avg(Departure.delay_min).label("avg_delay"),
                 func.count(Departure.id).label("total_trips"),
-            )
-            .filter(or_(
-                Departure.line.like("T%"),
-                Departure.line.like("L%"),
-                Departure.line.like("M%"),
-                Departure.line.like("S%"),
-            ))
-            .group_by(hour_expr)
-            .order_by(hour_expr)
-            .all()
+            ).filter(Departure.line.op('~')('^[TLMS][0-9]$'))
         )
+
+        if stop_id:
+            query = query.filter(Departure.stop_id == stop_id)
+
+        results = query.group_by(hour_expr).order_by(hour_expr).all()
         return [
             {
                 "hour": int(r.hour),
@@ -154,6 +153,6 @@ def delays_by_hour():
 
 @app.get("/departures/live/{stop_id}")
 def live_departures(stop_id: str):
-    deps = get_departures(stop_id) 
-    filtered = [d for d in deps if str(d.get("line", "")).startswith(("T", "L", "M", "S"))]
+    deps = get_departures(stop_id)
+    filtered = [d for d in deps if re.match(r'^[TLMS]\d$', str(d.get("line", "")))]
     return sorted(filtered, key=lambda x: x.get("scheduled_dt", ""))

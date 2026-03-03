@@ -49,13 +49,13 @@ def get_departures(stop_id: str = "200060"):
             location_props = event.get("location", {}).get("properties", {})
           
             departures.append({
-                "line": transportation.get("disassembledName"),        # e.g. "L2"
-                "lineName": transportation.get("number"),              # e.g. "L2 Randwick Line"
-                "destination": destination.get("name"),                # e.g. "Randwick Light Rail, Randwick"
-                "operator": transportation.get("operator", {}).get("name"),  # e.g. "Sydney Light Rail"
+                "line": transportation.get("disassembledName"),        # "L2"
+                "lineName": transportation.get("number"),              # "L2 Randwick Line"
+                "destination": destination.get("name"),                # "Randwick Light Rail, Randwick"
+                "operator": transportation.get("operator", {}).get("name"),  # "Sydney Light Rail"
                 "scheduled": event.get("departureTimePlanned"),
                 "estimated": event.get("departureTimeEstimated"),
-                "platform": location_props.get("platformName"),        # e.g. "Central Chalmers Street Light Rail"
+                "platform": location_props.get("platformName"),        # "Central Chalmers Street Light Rail"
                 "realtime": event.get("isRealtimeControlled", False),
             })
         except Exception as e:

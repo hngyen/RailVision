@@ -4,6 +4,15 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 const ACCENT = "#a78bfa"      // violet
 const ACCENT_DIM = "#3b1f6e"  // dark purple
 
+const STATIONS = [
+  { name: "Central", id: "200060" },
+  { name: "Town Hall", id: "200070" },
+  { name: "Parramatta", id: "215020" },
+  { name: "Strathfield", id: "213510" },
+  { name: "Redfern", id: "201510" },
+  { name: "Cabramatta", id: "216620" }
+]
+
 function StatCard({ label, value, sub }) {
   return (
     <div style={{
@@ -98,59 +107,80 @@ function DepartureBoard({ departures }) {
           </div>
         )}
 
+
 export default function App() {
-  const [delays, setDelays] = useState([])
-  const [byHour, setByHour] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [liveDeps, setLiveDeps] = useState([])
-  const API = "https://railvision-backend.onrender.com"
+  const [selectedStation, setSelectedStation] = useState(STATIONS[0]) // Central default
+  const [delays, setDelays] = useState([]);
+  const [byHour, setByHour] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [liveDeps, setLiveDeps] = useState([]);
+  const API = "https://railvision-backend.onrender.com";
 
   const fetchData = () => {
-    console.log("fetching data...", new Date().toLocaleTimeString())
-    Promise.all([
-      fetch(`${API}/analytics/worst-lines`).then(r => r.json()),
-      fetch(`${API}/analytics/delays/by-hour`).then(r => r.json()),
-      fetch(`${API}/departures/live/200060`).then(r => r.json()),
-    ]).then(([d, h, live]) => {
-      setDelays(Array.isArray(d) ? d : [])
-      setByHour(Array.isArray(h) ? h : [])
-      setLiveDeps(Array.isArray(live) ? live : [])
-      setLoading(false)
-    })
-  }
+      setLoading(true);
+      Promise.all([
+        fetch(`${API}/analytics/worst-lines?stop_id=${selectedStation.id}`).then(r => r.json()),
+        fetch(`${API}/analytics/delays/by-hour?stop_id=${selectedStation.id}`).then(r => r.json()),
+        fetch(`${API}/departures/live/${selectedStation.id}`).then(r => r.json()),
+      ]).then(([d, h, live]) => {
+        setDelays(Array.isArray(d) ? d : []);
+        setByHour(Array.isArray(h) ? h : []);
+        setLiveDeps(Array.isArray(live) ? live : []);
+        setLoading(false);
+      })
+    }
 
   useEffect(() => {
-    fetchData()
-    const interval = setInterval(fetchData, 60000)
-    return () => clearInterval(interval)
-  }, [])
-
+      fetchData();
+      const interval = setInterval(fetchData, 60000);
+      return () => clearInterval(interval);
+    }, [selectedStation])
+    
   const totalTrips = Array.isArray(delays) ? delays.reduce((s, l) => s + l.total_trips, 0) : 0
   const avgDelay = Array.isArray(delays) && delays.length ? (delays.reduce((s, l) => s + l.avg_delay_min, 0) / delays.length).toFixed(2) : 0
   const worstLine = Array.isArray(delays) && delays[0]?.line ? delays[0].line : "—"
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: "#0a0a09",
-      color: "#e7e5e4",
-      fontFamily: "'Courier New', monospace",
-      padding: "2.5rem",
-    }}>
-      {/* header */}
-      <div style={{ borderBottom: `1px solid ${ACCENT_DIM}`, paddingBottom: "1.5rem", marginBottom: "2rem" }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: "1rem" }}>
-          <h1 style={{ fontSize: "3rem", fontWeight: "bold", color: ACCENT, margin: 0, letterSpacing: "0.05em" }}>
-            RAILVISION
-          </h1>
-          <span style={{ color: "#cdbdd4", fontSize: "1rem", letterSpacing: "0.1em" }}>
-            NSW TRAINS ANALYTICS // CENTRAL STATION
-          </span>
+      <div style={{ minHeight: "100vh", background: "#0a0a09", color: "#e7e5e4", fontFamily: "'Courier New', monospace", padding: "2.5rem" }}>
+        
+        {/* header */}
+        <div style={{ borderBottom: `1px solid ${ACCENT_DIM}`, paddingBottom: "1.5rem", marginBottom: "2rem", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: "1rem" }}>
+              <h1 style={{ fontSize: "3rem", fontWeight: "bold", color: ACCENT, margin: 0, letterSpacing: "0.05em" }}>RAILVISION</h1>
+              <span style={{ color: "#cdbdd4", fontSize: "1rem", letterSpacing: "0.1em" }}>NSW TRAINS ANALYTICS</span>
+            </div>
+            <div style={{ color: "#cdbdd4", fontSize: "0.95rem", marginTop: "0.4rem", letterSpacing: "0.08em" }}>
+              LIVE DATA — UPDATES EVERY 60S
+            </div>
+          </div>
+
+          {/* dropdown */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.5rem" }}>
+            <label style={{ color: "#57534e", fontSize: "0.6rem", letterSpacing: "0.1em" }}>SELECT TERMINAL</label>
+            <select 
+              value={selectedStation.id}
+              onChange={(e) => {
+                  const station = STATIONS.find(s => s.id === e.target.value);
+                  setSelectedStation(station);
+              }}
+              style={{
+                background: "#0f0f0e",
+                color: ACCENT,
+                border: `1px solid ${ACCENT_DIM}`,
+                padding: "0.5rem 1rem",
+                fontFamily: "monospace",
+                fontSize: "0.9rem",
+                outline: "none",
+                cursor: "pointer"
+              }}
+            >
+              {STATIONS.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
-        <div style={{ color: "#cdbdd4", fontSize: "0.95rem", marginTop: "0.4rem", letterSpacing: "0.08em" }}>
-          LIVE DATA — UPDATES EVERY 60S
-        </div>
-      </div>
 
       <DepartureBoard departures={liveDeps} />
 
