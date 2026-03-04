@@ -61,7 +61,7 @@ STATIONS = {
     "Kings Cross": "201110",
     "Hornsby": "207710",
     "Rhodes": "213810",
-    "Auburn": "214410"
+    "Auburn": "214410",
 }
 
 # background polling job

@@ -19,8 +19,6 @@ def get_departures(stop_id: str = "200060"):
 
     sydney_tz = pytz.timezone("Australia/Sydney")
     now = datetime.now(sydney_tz)
-    print(f"Fetching for date: {now.strftime('%Y%m%d')} time: {now.strftime('%H%M')}")
-
     params = {
         "outputFormat": "rapidJSON",
         "coordOutputFormat": "EPSG:4326",
@@ -32,7 +30,7 @@ def get_departures(stop_id: str = "200060"):
         "itdDate": now.strftime("%Y%m%d"),
         "itdTime": now.strftime("%H%M"),
         "mode": "direct",
-        "numberOfResultsDeparture": "40",
+        "numberOfResultsDeparture": "100",
     }
 
     # if unsuccessful response
@@ -62,7 +60,17 @@ def get_departures(stop_id: str = "200060"):
             print(f"Skipping event: {e}")
     
     # pandas for delay calculation
+    if not departures:
+        print(f"No departures found for stop {stop_id}")
+        return
+    
     df = pd.DataFrame(departures)
+    
+    # Check if required columns exist
+    if "scheduled" not in df.columns or "estimated" not in df.columns:
+        print(f"Missing expected columns for stop {stop_id}. Available columns: {df.columns.tolist()}")
+        return
+    
     df["scheduled_dt"] = pd.to_datetime(df["scheduled"], utc=True)
     df["estimated_dt"] = pd.to_datetime(df["estimated"], utc=True)
     df["delay_min"] = (df["estimated_dt"] - df["scheduled_dt"]).dt.total_seconds() / 60
@@ -106,10 +114,8 @@ def get_departures(stop_id: str = "200060"):
         )
         db.execute(stmt)
         db.commit()
-        print(f"Saved {len(df)} departures to DB")
     except Exception as e:
         db.rollback()
-        print(f"DB save error: {e}")
     finally:
         db.close()
         

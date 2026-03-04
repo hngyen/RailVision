@@ -1,70 +1,116 @@
+import { useState } from "react"
+
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 const HOURS = Array.from({ length: 24 }, (_, i) => i)
 
 function getColor(delay) {
-  if (delay === null) return "#1c1917"
-  if (delay <= 0) return "#14532d"
-  if (delay <= 1) return "#166534"
-  if (delay <= 2) return "#854d0e"
-  if (delay <= 4) return "#c2410c"
-  return "#991b1b"
+  if (delay === null) return null
+  if (delay <= 0) return "var(--color-success)"
+  if (delay <= 1) return "#22a855"
+  if (delay <= 2) return "var(--color-warning)"
+  if (delay <= 4) return "#d97706"
+  return "var(--color-danger)"
 }
 
-export default function Heatmap({ data }) {
+export default function Heatmap({ data, stationName }) {
+  const [hoveredDay, setHoveredDay] = useState(null)
+  const [hoveredHour, setHoveredHour] = useState(null)
+
   // lookup map
   const lookup = {}
   data.forEach(d => {
     lookup[`${d.day}-${d.hour}`] = d.avg_delay_min
   })
 
+  const handleCellEnter = (day, hour) => {
+    setHoveredDay(day)
+    setHoveredHour(hour)
+  }
+
+  const handleCellLeave = () => {
+    setHoveredDay(null)
+    setHoveredHour(null)
+  }
+
     return (
-    <div style={{ width: "100%", overflowX: "hidden" }}> 
-        <div style={{ color: "#a78bfa", fontSize: "1.6rem", letterSpacing: "0.15em", marginBottom: "1.25rem" }}>
+    <div style={{ width: "100%", overflowX: "auto" }}> 
+        <div style={{ color: "var(--color-accent)", fontSize: "1.6rem", letterSpacing: "0.15em", marginBottom: "0.5rem" }}>
         ▸ DELAY HEATMAP — DAY × HOUR
         </div>
+        {stationName && <div style={{ color: "var(--color-text-tertiary)", fontSize: "0.7rem", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "1rem" }}>{stationName.toUpperCase()}</div>}
 
-        {/* HOURS HEADER */}
-        <div style={{ display: "flex", gap: "2px", alignItems: "center", marginBottom: "4px", marginLeft: "40px" }}>
-        {HOURS.map(h => (
-            <div key={h} style={{ 
-            flex: 1,           // Each cell takes an equal portion of the row
-            minWidth: "0",     // Prevents blowout on small screens
-            textAlign: "center", 
-            color: "#57534e", 
-            fontSize: "max(0.8rem, 0.6vw)", // Scales text with screen width
-            fontFamily: "monospace" 
-            }}>
-            {h}
-            </div>
-        ))}
-        </div>
+        {/* container for scrollable heatmap */}
+        <div style={{ display: "flex", flexDirection: "column", minWidth: "100%" }}>
+          {/* HOURS HEADER */}
+          <div style={{ display: "flex", gap: "2px", alignItems: "center", marginBottom: "4px" }}>
+            <div style={{ width: "40px", flexShrink: 0 }}></div>
+            {HOURS.map(h => (
+              <div 
+                key={h} 
+                className={hoveredHour === h ? "heatmap-hour-highlight" : ""}
+                style={{ 
+                flex: 1,           
+                minWidth: "0",     
+                textAlign: "center", 
+                color: hoveredHour === h ? "var(--color-accent)" : "var(--color-text-subtle)", 
+                fontSize: "0.7rem",
+                fontFamily: "var(--font-mono)",
+                fontWeight: hoveredHour === h ? "600" : "400",
+                transition: "color 0.2s"
+              }}>
+              {h}
+              </div>
+            ))}
+          </div>
 
-        {/* DAYS ROWS */}
-        {DAYS.map((day, dayIndex) => (
-        <div key={day} style={{ display: "flex", gap: "2px", alignItems: "center", marginBottom: "2px" }}>
-            <div style={{ width: "40px", color: "#57534e", fontSize: "0.8rem", fontFamily: "monospace", textAlign: "right", paddingRight: "4px", flexShrink: 0 }}>
-            {day}
+          {/* DAYS ROWS */}
+          {DAYS.map((day, dayIndex) => (
+            <div key={day} style={{ display: "flex", gap: "2px", alignItems: "center", marginBottom: "2px" }}>
+              <div 
+                className={hoveredDay === dayIndex ? "heatmap-day-highlight" : ""}
+                style={{ 
+                  width: "40px",
+                  flexShrink: 0,
+                  color: hoveredDay === dayIndex ? "var(--color-accent)" : "var(--color-text-subtle)", 
+                  fontSize: "0.8rem", 
+                  fontFamily: "var(--font-mono)", 
+                  textAlign: "right", 
+                  paddingRight: "4px",
+                  fontWeight: hoveredDay === dayIndex ? "600" : "400",
+                  transition: "color 0.2s"
+                }}>
+              {day}
+              </div>
+              
+              {HOURS.map(hour => {
+                const delay = lookup[`${dayIndex + 1}-${hour}`] ?? null
+                const bgColor = getColor(delay)
+                
+                return (
+                  <div
+                    key={hour}
+                    onMouseEnter={() => handleCellEnter(dayIndex, hour)}
+                    onMouseLeave={handleCellLeave}
+                    title={delay !== null ? `${day} ${hour}:00 — ${delay}m avg delay` : "No data"}
+                    style={{
+                      flex: 1,
+                      minWidth: "0",
+                      aspectRatio: "1 / 1",
+                      background: bgColor || "var(--color-border-dim)",
+                      backgroundImage: bgColor ? "none" : "repeating-linear-gradient(45deg, #1c1917, #1c1917 2px, #0a0a09 2px, #0a0a09 4px)",
+                      border: `1px solid var(--color-background)`,
+                      cursor: "default",
+                      transition: "transform 0.15s, box-shadow 0.15s",
+                      transform: hoveredDay === dayIndex && hoveredHour === hour ? "scale(1.1)" : "scale(1)",
+                      boxShadow: hoveredDay === dayIndex && hoveredHour === hour ? `0 0 10px rgba(167, 139, 250, 0.5)` : "none",
+                      zIndex: hoveredDay === dayIndex && hoveredHour === hour ? 2 : 1
+                    }}
+                  />
+                );
+              })}
             </div>
-            
-            {HOURS.map(hour => {
-            const delay = lookup[`${dayIndex + 1}-${hour}`] ?? null;
-            return (
-                <div
-                key={hour}
-                title={delay !== null ? `${day} ${hour}:00 — ${delay}m avg delay` : "No data"}
-                style={{
-                    flex: 1,             // Scale width automatically
-                    aspectRatio: "1 / 1", // Keeps them perfectly square as they resize
-                    background: getColor(delay),
-                    border: "1px solid #0a0a09",
-                    cursor: "default",
-                    minWidth: "4px"      // Prevents them from disappearing entirely
-                }}
-                />
-            );
-            })}
+          ))}
         </div>
-        ))}
     </div>
     )
 }

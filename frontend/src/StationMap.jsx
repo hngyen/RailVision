@@ -44,9 +44,41 @@ function getColor(delay) {
   return "#ef4444"
 }
 
-export default function StationMap({ stationStats }) {
+export default function StationMap({ stationStats, selectedStation, onStationSelect }) {
     const mapRef = useRef(null)
     const mapInstanceRef = useRef(null)
+    const markersRef = useRef({})
+    const previousSelectedRef = useRef(null)
+    const isMarkerClickRef = useRef(false)
+
+    useEffect(() => {
+      if (!mapInstanceRef.current || !selectedStation) return
+      
+      if (isMarkerClickRef.current) {
+        isMarkerClickRef.current = false
+        return
+      }
+      
+      const station = STATION_COORDS[selectedStation.id]
+      if (station) {
+        mapInstanceRef.current.flyTo([station.lat, station.lng], 14, {
+          duration: 1.5,
+          easeLinearity: 0.25
+        })
+      }
+    }, [selectedStation])
+
+    // Apply/remove glow effect on marker selection
+    useEffect(() => {
+      if (previousSelectedRef.current && markersRef.current[previousSelectedRef.current]) {
+        markersRef.current[previousSelectedRef.current].getElement()?.classList.remove("current-station-marker")
+      }
+      
+      if (selectedStation && markersRef.current[selectedStation.id]) {
+        markersRef.current[selectedStation.id].getElement()?.classList.add("current-station-marker")
+        previousSelectedRef.current = selectedStation.id
+      }
+    }, [selectedStation])
 
     useEffect(() => {
       if (mapInstanceRef.current) return
@@ -63,28 +95,47 @@ export default function StationMap({ stationStats }) {
         const delay = stats?.avg_delay ?? null
         const trips = stats?.total_trips ?? 0
 
-        L.circleMarker([station.lat, station.lng], {
+        const marker = L.circleMarker([station.lat, station.lng], {
           radius: Math.max(8, Math.min(24, trips / 50)),
           color: getColor(delay),
           fillColor: getColor(delay),
           fillOpacity: 0.7
         })
         .bindPopup(`
-          <div style="font-family: monospace; font-size: 0.8rem">
+          <div style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--color-text)">
             <strong>${station.name}</strong><br/>
             Avg delay: ${delay !== null ? `${delay}m` : "no data"}<br/>
             Trips recorded: ${trips}<br/>
             Worst line: ${stats?.worst_line ?? "—"}
           </div>
         `)
+        .on('click', () => {
+          isMarkerClickRef.current = true
+          onStationSelect({ id: stopId, name: station.name })
+        })
         .addTo(map)
+
+        // pulsing marker for high delays
+        if (delay > 5) {
+          const pulsingMarker = L.circleMarker([station.lat, station.lng], {
+            radius: 12,
+            color: getColor(delay),
+            fillColor: "transparent",
+            weight: 2,
+            opacity: 0.8
+          })
+          pulsingMarker.setStyle({ className: "pulse-marker" })
+          pulsingMarker.addTo(map)
+        }
+
+        markersRef.current[stopId] = marker
       })
 
       return () => {
         map.remove()
         mapInstanceRef.current = null
       }
-    }, [stationStats])
+    }, [stationStats, onStationSelect])
 
-    return <div ref={mapRef} style={{ height: "500px", border: "1px solid #292524" }} />
-  }
+    return <div ref={mapRef} style={{ height: "100%", width: "100%" }} />
+}
