@@ -59,7 +59,7 @@ function StatCard({ label, value, sub, loading }) {
       ) : (
         <div style={{ color: ACCENT, fontSize: "2rem", fontFamily: "'Courier New', monospace", fontWeight: "bold", lineHeight: 1 }}>{value}</div>
       )}
-      {sub && !loading && <div style={{ color: "var(--color-border-dim)", fontSize: "0.75rem", marginTop: "0.4rem" }}>{sub}</div>}
+      {sub && !loading && <div style={{ color: "var(--color-accent-dim)", fontSize: "0.75rem", marginTop: "0.4rem" }}>{sub}</div>}
     </div>
   )
 }
