@@ -1,6 +1,6 @@
 # RailVision
 
-**Live NSW Trains analytics dashboard: real-time departure tracking and delay analysis for 32 major train stations in Sydney.**
+**Live NSW Trains analytics dashboard: real-time departure tracking and delay analysis for major train stations across Sydney's rail network.**
 
 🔗 **[Live Demo](https://railvision-frontend.vercel.app)** &nbsp;|&nbsp; 📡 **[API Docs](https://railvision-backend.onrender.com/docs)**
 
@@ -18,15 +18,13 @@ RailVision pulls live departure data from the Transport for NSW (TfNSW) Open Dat
 
 ## Features
 
-- **Live departure board** - next trains from train stations with platform, destination, scheduled time, and real-time delay status
-- **Multi-station support through interactive map as primary navigation tool with click-to-select, alongside traditional dropdown/search tool
+- **Live departure board** - upcoming trains for all 32 stations with platform, destination, scheduled time, and real-time delay status
+- **Multi-station support** - through interactive map as primary navigation tool with click-to-select, alongside traditional dropdown/search tool
 - **Line performance rankings** - all T, L, and M lines ranked by average delay with on-time percentage
 - **Delay across week** - Day/hour heatmap showing peak disruption windows
 - **Delay by hour chart** - bar chart showing which hours of the day have the worst delays (Sydney local time)
 - **Network stats per station** - total trips recorded, average trips per day, duration of RailVision tracking, average delay, worst performing line, total lines tracked
 - **Background poller** - server continuously collects data every 60 seconds using APScheduler with dashboard auto-refresh
-
-32 stations across Sydney's rail network
 
 ---
 ## Screenshots
