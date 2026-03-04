@@ -30,15 +30,12 @@ RailVision pulls live departure data from the Transport for NSW (TfNSW) Open Dat
 ## Screenshots
 
 ### Dashboard Overview
-<!-- (FULL DASHBOARD SCREENSHOT HERE) -->
 ![Dashboard](./docs/screenshots/dashboard.png)
 
 ### Live Departure Board
-<!-- (DEPARTURE BOARD SCREENSHOT HERE) -->
 ![Departures](./docs/screenshots/departures.png)
 
 ### Delay Analytics
-<!-- (ANALYTICS/CHART SCREENSHOT HERE) -->
 ![Analytics](./docs/screenshots/analytics.png)
 
 ---
