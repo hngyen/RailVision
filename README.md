@@ -2,7 +2,7 @@
 
 **Live NSW Trains analytics dashboard: real-time departure tracking and delay analysis for major train stations across Sydney's rail network.**
 
-🔗 **[Live Demo](https://railvision-frontend.vercel.app)** &nbsp;|&nbsp; 📡 **[API Docs](https://railvision-backend.onrender.com/docs)**
+🔗 **[Live Demo](https://railvision-frontend.vercel.app)** (currently down due to free tier) &nbsp;|&nbsp; 📡 **[API Docs](https://railvision-backend.onrender.com/docs)**
 
 ---
 
