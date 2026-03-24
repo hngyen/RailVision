@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func, Integer, or_, cast, text
 from sqlalchemy.types import String
 from sqlalchemy.types import TIMESTAMP
+import os
 import models
 from database import engine, SessionLocal
 from models import Departure
@@ -69,9 +70,12 @@ def poll_departures():
     for name, stop_id in STATIONS.items():
         get_departures(stop_id)
 
-scheduler = BackgroundScheduler()
-scheduler.add_job(poll_departures, "interval", seconds=60)
-scheduler.start()
+ENABLE_SCHEDULER = os.getenv("RAILVISION_ENABLE_SCHEDULER", "1").lower() in {"1", "true", "yes"}
+
+if ENABLE_SCHEDULER:
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(poll_departures, "interval", seconds=60)
+    scheduler.start()
 
 @app.api_route("/", methods=["GET", "HEAD"])
 def root():

@@ -1,0 +1,18 @@
+{
+  "captured_at_utc": "2026-03-24T16:30:10.119889+00:00",
+  "db_metrics": {
+    "db_path": "/home/henry/RailVision/data/railvision.db",
+    "db_exists": true,
+    "total_rows": 4327,
+    "duplicate_key_groups": 339,
+    "duplicate_extra_rows": 3952,
+    "latest_fetched_at": "2026-03-01T02:35:14.591187+00:00",
+    "freshness_lag_seconds": 2037295.55,
+    "top_stops_by_rows": [
+      {
+        "stop_id": "200060",
+        "c": 4327
+      }
+    ]
+  }
+}

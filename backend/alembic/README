@@ -1,0 +1,11 @@
+Single-database Alembic setup for RailVision backend.
+
+Quick start:
+1) cd backend
+2) alembic current
+3) alembic revision -m "describe change"
+4) alembic upgrade head
+
+Notes:
+- DATABASE_URL from environment is used when present.
+- Fallback URL in alembic.ini points to local sqlite data store.
