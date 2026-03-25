@@ -4,11 +4,12 @@ import math
 
 from datetime import datetime, timezone
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 import pytz
 
 
 from config import API_KEY, BASE_URL
-from database import SessionLocal
+from database import SessionLocal, engine
 from models import Departure
 
 
@@ -62,7 +63,7 @@ def get_departures(stop_id: str = "200060"):
     # pandas for delay calculation
     if not departures:
         print(f"No departures found for stop {stop_id}")
-        return
+        return []
     
     df = pd.DataFrame(departures)
     
@@ -79,43 +80,40 @@ def get_departures(stop_id: str = "200060"):
     db = SessionLocal()
     try:
         fetched_at = datetime.now(timezone.utc).isoformat()
-        for _, row in df.iterrows():
-            record = Departure(
-                line=row["line"],
-                line_name=row["lineName"],
-                destination=row["destination"],
-                operator=row["operator"],
-                platform=row["platform"],
-                scheduled=row["scheduled_dt"].isoformat(),
-                estimated=row["estimated_dt"].isoformat() if pd.notna(row["estimated_dt"]) else None,
-                delay_min=row["delay_min"] if pd.notna(row["delay_min"]) else None,
-                realtime=row["realtime"],
-                stop_id=stop_id,
-                fetched_at=fetched_at,
-            )
 
-        stmt = pg_insert(Departure).values(
-            line=row["line"],
-            line_name=row["lineName"],
-            destination=row["destination"],
-            operator=row["operator"],
-            platform=row["platform"],
-            scheduled=row["scheduled_dt"].isoformat(),
-            estimated=row["estimated_dt"].isoformat() if pd.notna(row["estimated_dt"]) else None,
-            delay_min=row["delay_min"] if pd.notna(row["delay_min"]) else None,
-            realtime=row["realtime"],
-            stop_id=stop_id,
-            fetched_at=fetched_at,
-        ).on_conflict_do_update(
-            constraint='unique_departure',
-            set_={"estimated": row["estimated_dt"].isoformat() if pd.notna(row["estimated_dt"]) else None,
+        rows = [
+            {
+                "line": row["line"],
+                "line_name": row["lineName"],
+                "destination": row["destination"],
+                "operator": row["operator"],
+                "platform": row["platform"],
+                "scheduled": row["scheduled_dt"].isoformat(),
+                "estimated": row["estimated_dt"].isoformat() if pd.notna(row["estimated_dt"]) else None,
                 "delay_min": row["delay_min"] if pd.notna(row["delay_min"]) else None,
-                "fetched_at": fetched_at}
+                "realtime": bool(row["realtime"]),
+                "stop_id": stop_id,
+                "fetched_at": fetched_at,
+            }
+            for _, row in df.iterrows()
+        ]
+
+        insert_fn = pg_insert if engine.dialect.name == "postgresql" else sqlite_insert
+        insert_stmt = insert_fn(Departure).values(rows)
+        stmt = insert_stmt.on_conflict_do_update(
+            index_elements=["line", "scheduled", "stop_id"],
+            set_={
+                "estimated": insert_stmt.excluded.estimated,
+                "delay_min": insert_stmt.excluded.delay_min,
+                "fetched_at": insert_stmt.excluded.fetched_at,
+            }
         )
         db.execute(stmt)
         db.commit()
+        print({"stop_id": stop_id, "fetched": len(rows), "upserted": len(rows)})
     except Exception as e:
         db.rollback()
+        print(f"DB error for stop {stop_id}: {e}")
     finally:
         db.close()
         

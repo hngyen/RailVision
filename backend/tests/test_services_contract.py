@@ -24,10 +24,6 @@ def test_get_departures_non_200_returns_error_dict(monkeypatch):
     assert "error" in result
 
 
-@pytest.mark.xfail(
-    reason="Known bug: empty stopEvents currently returns None instead of [].",
-    strict=False,
-)
 def test_get_departures_empty_events_returns_empty_list(monkeypatch):
     def fake_get(*_args, **_kwargs):
         return FakeResponse(status_code=200, payload={"stopEvents": []})
@@ -35,5 +31,4 @@ def test_get_departures_empty_events_returns_empty_list(monkeypatch):
     monkeypatch.setattr(services.requests, "get", fake_get)
     result = services.get_departures("200060")
 
-    # Target behavior after refactor: consistently return list for successful calls.
     assert result == []
