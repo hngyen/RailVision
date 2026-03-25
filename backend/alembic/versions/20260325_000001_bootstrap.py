@@ -19,8 +19,27 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    pass
+    op.create_table(
+        "departures",
+        sa.Column("id", sa.Integer(), primary_key=True, index=True),
+        sa.Column("line", sa.String()),
+        sa.Column("line_name", sa.String()),
+        sa.Column("destination", sa.String()),
+        sa.Column("operator", sa.String()),
+        sa.Column("platform", sa.String()),
+        sa.Column("scheduled", sa.String()),
+        sa.Column("estimated", sa.String()),
+        sa.Column("delay_min", sa.Float()),
+        sa.Column("realtime", sa.Boolean()),
+        sa.Column("stop_id", sa.String()),
+        sa.Column("fetched_at", sa.String()),
+        sa.UniqueConstraint("line", "scheduled", "stop_id", name="unique_departure"),
+    )
+    op.create_index("idx_line_scheduled", "departures", ["line", "scheduled"])
+    op.create_index("idx_stop_scheduled", "departures", ["stop_id", "scheduled"])
 
 
 def downgrade() -> None:
-    pass
+    op.drop_index("idx_stop_scheduled", table_name="departures")
+    op.drop_index("idx_line_scheduled", table_name="departures")
+    op.drop_table("departures")

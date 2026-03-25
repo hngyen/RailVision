@@ -6,7 +6,6 @@ from sqlalchemy import func, Integer, or_, cast, text
 from sqlalchemy.types import String
 from sqlalchemy.types import TIMESTAMP
 import os
-import models
 from database import engine, SessionLocal
 from models import Departure
 from exceptions import UpstreamUnavailableError
@@ -15,8 +14,6 @@ from services import get_departures
 from config import API_KEY, BASE_URL
 from typing import Optional
 import re
-
-models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
