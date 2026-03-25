@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,6 +9,8 @@ import os
 import models
 from database import engine, SessionLocal
 from models import Departure
+from exceptions import UpstreamUnavailableError
+from schemas import DepartureOut
 from services import get_departures
 from config import API_KEY, BASE_URL
 from typing import Optional
@@ -81,9 +83,12 @@ if ENABLE_SCHEDULER:
 def root():
     return {"message": "RailVision API is running"}
 
-@app.get("/departures/{stop_id}")
+@app.get("/departures/{stop_id}", response_model=list[DepartureOut])
 def departures(stop_id: str):
-    return get_departures(stop_id)
+    try:
+        return get_departures(stop_id)
+    except UpstreamUnavailableError as e:
+        raise HTTPException(status_code=502, detail=e.message)
 
 @app.get("/analytics/delays/by-line")
 def delay_by_lines(stop_id: Optional[str] = None):
@@ -186,9 +191,12 @@ def delays_by_hour(stop_id: Optional[str] = None):
     finally:
         db.close()
 
-@app.get("/departures/live/{stop_id}")
+@app.get("/departures/live/{stop_id}", response_model=list[DepartureOut])
 def live_departures(stop_id: str):
-    deps = get_departures(stop_id)
+    try:
+        deps = get_departures(stop_id)
+    except UpstreamUnavailableError as e:
+        raise HTTPException(status_code=502, detail=e.message)
     filtered = [d for d in deps if re.match(r'^[TLMS]\d$', str(d.get("line", "")))]
     return sorted(filtered, key=lambda x: x.get("scheduled_dt", ""))
 

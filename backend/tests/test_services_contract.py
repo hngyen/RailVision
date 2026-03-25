@@ -1,6 +1,7 @@
 import pytest
 
 import services
+from exceptions import UpstreamUnavailableError
 
 
 class FakeResponse:
@@ -13,15 +14,16 @@ class FakeResponse:
         return self._payload
 
 
-def test_get_departures_non_200_returns_error_dict(monkeypatch):
+def test_get_departures_non_200_raises_upstream_error(monkeypatch):
     def fake_get(*_args, **_kwargs):
         return FakeResponse(status_code=503, text="service unavailable")
 
     monkeypatch.setattr(services.requests, "get", fake_get)
-    result = services.get_departures("200060")
 
-    assert isinstance(result, dict)
-    assert "error" in result
+    with pytest.raises(UpstreamUnavailableError) as exc_info:
+        services.get_departures("200060")
+
+    assert "service unavailable" in str(exc_info.value)
 
 
 def test_get_departures_empty_events_returns_empty_list(monkeypatch):

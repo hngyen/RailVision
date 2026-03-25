@@ -32,15 +32,12 @@ def test_live_departures_filters_non_rail_lines(client, monkeypatch):
     assert [row["line"] for row in payload] == ["M1", "T1"]
 
 
-@pytest.mark.xfail(
-    reason="Known bug: /departures/live crashes when get_departures returns an error dict.",
-    strict=False,
-)
 def test_live_departures_handles_upstream_error_shape(client, monkeypatch):
+    from exceptions import UpstreamUnavailableError
     import main
 
-    monkeypatch.setattr(main, "get_departures", lambda _stop_id: {"error": "timeout"})
+    monkeypatch.setattr(main, "get_departures", lambda _stop_id: (_ for _ in ()).throw(UpstreamUnavailableError("timeout")))
     response = client.get("/departures/live/200060")
 
-    # Target behavior after refactor: return a typed API error instead of 500 crash.
     assert response.status_code == 502
+    assert response.json()["detail"] == "timeout"

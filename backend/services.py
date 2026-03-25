@@ -10,6 +10,7 @@ import pytz
 
 from config import API_KEY, BASE_URL
 from database import SessionLocal, engine
+from exceptions import UpstreamUnavailableError
 from models import Departure
 
 
@@ -37,7 +38,7 @@ def get_departures(stop_id: str = "200060"):
     # if unsuccessful response
     response = requests.get(BASE_URL, headers=headers, params=params)
     if response.status_code != 200:
-        return {"error": response.text}
+        raise UpstreamUnavailableError(response.text)
     data = response.json()
 
     departures = []
