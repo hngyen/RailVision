@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func, Integer
@@ -7,9 +8,26 @@ from exceptions import UpstreamUnavailableError
 from schemas import DepartureOut
 from services import get_departures
 from typing import Optional
+import asyncio
 import re
 
-app = FastAPI()
+
+async def _poll_loop():
+    """Run the worker polling loop as a background asyncio task."""
+    from worker import poll_all_stations, POLL_INTERVAL
+    while True:
+        poll_all_stations()
+        await asyncio.sleep(POLL_INTERVAL)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task = asyncio.create_task(_poll_loop())
+    yield
+    task.cancel()
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
