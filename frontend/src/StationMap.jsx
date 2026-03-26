@@ -80,9 +80,10 @@ export default function StationMap({ stationStats, selectedStation, onStationSel
       }
     }, [selectedStation])
 
+    // Initialise the map and create markers once — never re-runs on data updates.
     useEffect(() => {
       if (mapInstanceRef.current) return
-      
+
       const map = L.map(mapRef.current).setView([-33.87, 151.05], 11)
       mapInstanceRef.current = map
 
@@ -91,42 +92,18 @@ export default function StationMap({ stationStats, selectedStation, onStationSel
       }).addTo(map)
 
       Object.entries(STATION_COORDS).forEach(([stopId, station]) => {
-        const stats = stationStats[stopId]
-        const delay = stats?.avg_delay ?? null
-        const trips = stats?.total_trips ?? 0
-
         const marker = L.circleMarker([station.lat, station.lng], {
-          radius: Math.max(8, Math.min(24, trips / 50)),
-          color: getColor(delay),
-          fillColor: getColor(delay),
+          radius: 8,
+          color: getColor(null),
+          fillColor: getColor(null),
           fillOpacity: 0.7
         })
-        .bindPopup(`
-          <div style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--color-text)">
-            <strong>${station.name}</strong><br/>
-            Avg delay: ${delay !== null ? `${delay}m` : "no data"}<br/>
-            Trips recorded: ${trips}<br/>
-            Worst line: ${stats?.worst_line ?? "—"}
-          </div>
-        `)
+        .bindPopup(`<div style="font-family: monospace; font-size: 0.75rem"><strong>${station.name}</strong><br/>Loading…</div>`)
         .on('click', () => {
           isMarkerClickRef.current = true
           onStationSelect({ id: stopId, name: station.name })
         })
         .addTo(map)
-
-        // pulsing marker for high delays
-        if (delay > 5) {
-          const pulsingMarker = L.circleMarker([station.lat, station.lng], {
-            radius: 12,
-            color: getColor(delay),
-            fillColor: "transparent",
-            weight: 2,
-            opacity: 0.8
-          })
-          pulsingMarker.setStyle({ className: "pulse-marker" })
-          pulsingMarker.addTo(map)
-        }
 
         markersRef.current[stopId] = marker
       })
@@ -135,7 +112,32 @@ export default function StationMap({ stationStats, selectedStation, onStationSel
         map.remove()
         mapInstanceRef.current = null
       }
-    }, [stationStats, onStationSelect])
+    }, [onStationSelect])
+
+    // Update marker styles and popups whenever stationStats refreshes.
+    // Runs independently of map init — never tears down the map.
+    useEffect(() => {
+      Object.entries(markersRef.current).forEach(([stopId, marker]) => {
+        const stats = stationStats[stopId]
+        const delay = stats?.avg_delay ?? null
+        const trips = stats?.total_trips ?? 0
+        const station = STATION_COORDS[stopId]
+
+        marker.setStyle({
+          radius: Math.max(8, Math.min(24, trips / 50)),
+          color: getColor(delay),
+          fillColor: getColor(delay),
+        })
+        marker.setPopupContent(`
+          <div style="font-family: monospace; font-size: 0.75rem; color: var(--color-text)">
+            <strong>${station.name}</strong><br/>
+            Avg delay: ${delay !== null ? `${delay}m` : "no data"}<br/>
+            Trips recorded: ${trips}<br/>
+            Worst line: ${stats?.worst_line ?? "—"}
+          </div>
+        `)
+      })
+    }, [stationStats])
 
     return <div ref={mapRef} style={{ height: "100%", width: "100%" }} />
 }

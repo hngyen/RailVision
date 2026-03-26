@@ -1,6 +1,8 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 from sqlalchemy import func, Integer
 from database import engine, SessionLocal
 from models import Departure
@@ -40,6 +42,11 @@ app.add_middleware(
 @app.api_route("/", methods=["GET", "HEAD"])
 def root():
     return {"message": "RailVision API is running"}
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 def _query_departures(stop_id: str, rail_only: bool = False) -> list[dict]:
     """Read upcoming departures for a stop from the database."""

@@ -14,6 +14,7 @@ import pytz
 from config import API_KEY, BASE_URL
 from database import SessionLocal, engine
 from exceptions import UpstreamUnavailableError
+from metrics import poll_duration_seconds, upstream_errors_total, events_ingested_total, db_write_duration_seconds
 from models import Departure
 
 logger = logging.getLogger(__name__)
@@ -48,6 +49,11 @@ async def _fetch_tfnsw(url: str, headers: dict, params: dict) -> httpx.Response:
 
 
 async def get_departures(stop_id: str = "200060"):
+    with poll_duration_seconds.labels(stop_id=stop_id).time():
+        return await _get_departures_inner(stop_id)
+
+
+async def _get_departures_inner(stop_id: str):
     headers = {
         "Authorization": f"apikey {API_KEY}"
     }
@@ -60,7 +66,7 @@ async def get_departures(stop_id: str = "200060"):
         "type_dm": "stop",
         "name_dm": stop_id,
         "departureMonitorMacro": "true",
-        "TfNSWDM": "true", 
+        "TfNSWDM": "true",
         "version": "10.2.1.42",
         "itdDate": now.strftime("%Y%m%d"),
         "itdTime": now.strftime("%H%M"),
@@ -70,6 +76,7 @@ async def get_departures(stop_id: str = "200060"):
 
     response = await _fetch_tfnsw(BASE_URL, headers=headers, params=params)
     if response.status_code != 200:
+        upstream_errors_total.labels(stop_id=stop_id).inc()
         raise UpstreamUnavailableError(response.text)
     data = response.json()
 
@@ -91,19 +98,17 @@ async def get_departures(stop_id: str = "200060"):
                 "realtime": event.get("isRealtimeControlled", False),
             })
         except Exception as e:
-            print(f"Skipping event: {e}")
-    
-    # pandas for delay calculation
+            logger.warning("Skipping event for stop %s: %s", stop_id, e)
+
     if not departures:
-        print(f"No departures found for stop {stop_id}")
+        logger.info("No departures found for stop %s", stop_id)
         return []
-    
+
     df = pd.DataFrame(departures)
-    
-    # Check if required columns exist
+
     if "scheduled" not in df.columns or "estimated" not in df.columns:
-        print(f"Missing expected columns for stop {stop_id}. Available columns: {df.columns.tolist()}")
-        return
+        logger.error("Missing expected columns for stop %s. Available: %s", stop_id, df.columns.tolist())
+        return []
     
     df["scheduled_dt"] = pd.to_datetime(df["scheduled"], utc=True)
     df["estimated_dt"] = pd.to_datetime(df["estimated"], utc=True)
@@ -142,12 +147,14 @@ async def get_departures(stop_id: str = "200060"):
                 "fetched_at": insert_stmt.excluded.fetched_at,
             }
         )
-        db.execute(stmt)
-        db.commit()
-        print({"stop_id": stop_id, "fetched": len(rows), "upserted": len(rows)})
+        with db_write_duration_seconds.labels(stop_id=stop_id).time():
+            db.execute(stmt)
+            db.commit()
+        events_ingested_total.labels(stop_id=stop_id).inc(len(rows))
+        logger.info("stop_id=%s fetched=%d upserted=%d", stop_id, len(rows), len(rows))
     except Exception as e:
         db.rollback()
-        print(f"DB error for stop {stop_id}: {e}")
+        logger.error("DB error for stop %s: %s", stop_id, e)
     finally:
         db.close()
         

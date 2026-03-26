@@ -188,6 +188,9 @@ export default function App() {
         setLiveDeps(Array.isArray(live) ? live : [])
         setByDayHour(Array.isArray(dayHour) ? dayHour : [])
         setStationStats(stats || {})
+      }).catch(err => {
+        console.error("Failed to fetch data:", err)
+      }).finally(() => {
         setLoading(false)
       })
     }
