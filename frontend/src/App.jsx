@@ -164,7 +164,7 @@ export default function App() {
   const [stationStats, setStationStats] = useState({})
   const [activeTab, setActiveTab] = useState("overview")
   const tabs = ["overview", "analytics"]
-  const API = "https://railvision-backend.onrender.com";
+  const API = "https://railvision-app-jpl5c.ondigitalocean.app";
 
   const filteredStations = STATIONS.filter(s => 
     s.name.toLowerCase().includes("")

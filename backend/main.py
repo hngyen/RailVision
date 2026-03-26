@@ -2,9 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import func, Integer, or_, cast, text
-from sqlalchemy.types import String
-from sqlalchemy.types import TIMESTAMP
+from sqlalchemy import func, Integer, text
 import os
 from database import engine, SessionLocal
 from models import Departure
@@ -157,7 +155,7 @@ def delays_by_hour(stop_id: Optional[str] = None):
         is_postgres = "postgresql" in str(engine.url)
         if is_postgres:
             hour_expr = func.to_char(
-                cast(Departure.scheduled, TIMESTAMP) + text("interval '11 hours'"),
+                Departure.scheduled + text("interval '11 hours'"),
                 'HH24'
             )
         else:
@@ -200,14 +198,14 @@ def delays_by_day_hour(stop_id: Optional[str] = None):
     db = SessionLocal()
     try:
         is_postgres = "postgresql" in str(engine.url)
-        
+
         if is_postgres:
             hour_expr = func.to_char(
-                cast(Departure.scheduled, TIMESTAMP) + text("interval '11 hours'"),
+                Departure.scheduled + text("interval '11 hours'"),
                 'HH24'
             )
             day_expr = func.to_char(
-                cast(Departure.scheduled, TIMESTAMP) + text("interval '11 hours'"),
+                Departure.scheduled + text("interval '11 hours'"),
                 'D'
             )
         else:

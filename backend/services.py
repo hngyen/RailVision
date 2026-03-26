@@ -80,7 +80,7 @@ def get_departures(stop_id: str = "200060"):
     # save to DB
     db = SessionLocal()
     try:
-        fetched_at = datetime.now(timezone.utc).isoformat()
+        fetched_at = datetime.now(timezone.utc)
 
         rows = [
             {
@@ -89,8 +89,8 @@ def get_departures(stop_id: str = "200060"):
                 "destination": row["destination"],
                 "operator": row["operator"],
                 "platform": row["platform"],
-                "scheduled": row["scheduled_dt"].isoformat(),
-                "estimated": row["estimated_dt"].isoformat() if pd.notna(row["estimated_dt"]) else None,
+                "scheduled": row["scheduled_dt"].to_pydatetime(),
+                "estimated": row["estimated_dt"].to_pydatetime() if pd.notna(row["estimated_dt"]) else None,
                 "delay_min": row["delay_min"] if pd.notna(row["delay_min"]) else None,
                 "realtime": bool(row["realtime"]),
                 "stop_id": stop_id,

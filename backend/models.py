@@ -11,12 +11,12 @@ class Departure(Base):
     destination = Column(String)
     operator = Column(String)
     platform = Column(String)
-    scheduled = Column(String)
-    estimated = Column(String)
+    scheduled = Column(DateTime(timezone=True))
+    estimated = Column(DateTime(timezone=True))
     delay_min = Column(Float)
     realtime = Column(Boolean)
     stop_id = Column(String)
-    fetched_at = Column(String)  # when pulled from the API
+    fetched_at = Column(DateTime(timezone=True))
 
     __table_args__ = (
         UniqueConstraint('line', 'scheduled', 'stop_id', name='unique_departure'),
