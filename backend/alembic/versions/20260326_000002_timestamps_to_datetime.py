@@ -22,17 +22,19 @@ def upgrade() -> None:
     conn = op.get_bind()
 
     if conn.dialect.name == "postgresql":
-        # Drop unique constraint so type conversion doesn't collide on duplicates
-        op.drop_constraint("unique_departure", "departures", type_="unique")
+        # Drop constraint and indexes that reference columns we're converting
+        op.execute("ALTER TABLE departures DROP CONSTRAINT IF EXISTS unique_departure")
+        op.execute("DROP INDEX IF EXISTS idx_line_scheduled")
+        op.execute("DROP INDEX IF EXISTS idx_stop_scheduled")
 
-        # Deduplicate: keep only the row with the latest fetched_at per logical trip
+        # Deduplicate using id (handles rows with identical fetched_at)
         op.execute(
             "DELETE FROM departures d1 USING departures d2 "
             "WHERE d1.line = d2.line AND d1.scheduled = d2.scheduled "
-            "AND d1.stop_id = d2.stop_id AND d1.fetched_at < d2.fetched_at"
+            "AND d1.stop_id = d2.stop_id AND d1.id < d2.id"
         )
 
-        # Now safe to convert types
+        # Now safe to convert types — no indexes to rebuild
         op.execute(
             "ALTER TABLE departures "
             "ALTER COLUMN scheduled TYPE TIMESTAMPTZ USING scheduled::timestamptz"
@@ -46,8 +48,10 @@ def upgrade() -> None:
             "ALTER COLUMN fetched_at TYPE TIMESTAMPTZ USING fetched_at::timestamptz"
         )
 
-        # Re-add unique constraint on the now-clean data
+        # Recreate constraint and indexes on clean, converted data
         op.create_unique_constraint("unique_departure", "departures", ["line", "scheduled", "stop_id"])
+        op.create_index("idx_line_scheduled", "departures", ["line", "scheduled"])
+        op.create_index("idx_stop_scheduled", "departures", ["stop_id", "scheduled"])
     else:
         # SQLite: recreate table with new column types via batch
         with op.batch_alter_table("departures", schema=None) as batch_op:

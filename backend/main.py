@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import func, Integer, text
+from sqlalchemy import func, Integer
 import os
 from database import engine, SessionLocal
 from models import Departure
@@ -155,11 +155,11 @@ def delays_by_hour(stop_id: Optional[str] = None):
         is_postgres = "postgresql" in str(engine.url)
         if is_postgres:
             hour_expr = func.to_char(
-                Departure.scheduled + text("interval '11 hours'"), # real timestamp now
+                func.timezone('Australia/Sydney', Departure.scheduled),
                 'HH24'
             )
         else:
-            hour_expr = func.strftime('%H', Departure.scheduled, '+11 hours')
+            hour_expr = func.strftime('%H', Departure.scheduled, 'localtime')
 
         query = (
             db.query(
@@ -201,16 +201,16 @@ def delays_by_day_hour(stop_id: Optional[str] = None):
 
         if is_postgres:
             hour_expr = func.to_char(
-                Departure.scheduled + text("interval '11 hours'"),
+                func.timezone('Australia/Sydney', Departure.scheduled),
                 'HH24'
             )
             day_expr = func.to_char(
-                Departure.scheduled + text("interval '11 hours'"),
+                func.timezone('Australia/Sydney', Departure.scheduled),
                 'D'
             )
         else:
-            hour_expr = func.strftime('%H', Departure.scheduled, '+11 hours')
-            day_expr = func.strftime('%w', Departure.scheduled, '+11 hours')
+            hour_expr = func.strftime('%H', Departure.scheduled, 'localtime')
+            day_expr = func.strftime('%w', Departure.scheduled, 'localtime')
 
         query = (
             db.query(
