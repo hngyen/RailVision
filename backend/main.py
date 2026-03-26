@@ -21,9 +21,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
-        "http://localhost:5174",
-        "https://railvision-frontend.vercel.app",
-        "https://www.railvision-frontend.vercel.app",
+        "https://railvision-dash.vercel.app",
     ],
     allow_methods=["*"],
     allow_headers=["*"],
