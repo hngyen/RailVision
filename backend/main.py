@@ -155,7 +155,7 @@ def delays_by_hour(stop_id: Optional[str] = None):
         is_postgres = "postgresql" in str(engine.url)
         if is_postgres:
             hour_expr = func.to_char(
-                Departure.scheduled + text("interval '11 hours'"),
+                Departure.scheduled + text("interval '11 hours'"), # real timestamp now
                 'HH24'
             )
         else:
