@@ -1,23 +1,53 @@
 import re
-import requests
+import asyncio
+import httpx
 import pandas as pd
 import math
+import random
+import logging
 
 from datetime import datetime, timezone
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 import pytz
 
-
 from config import API_KEY, BASE_URL
-
-RAIL_PATTERN = re.compile(r'^[TLMS]\d$')
 from database import SessionLocal, engine
 from exceptions import UpstreamUnavailableError
 from models import Departure
 
+logger = logging.getLogger(__name__)
 
-def get_departures(stop_id: str = "200060"):
+RAIL_PATTERN = re.compile(r'^[TLMS]\d$')
+
+_http_client = httpx.AsyncClient(timeout=httpx.Timeout(connect=5.0, read=10.0, write=5.0, pool=5.0))
+_MAX_RETRIES = 3
+_BASE_BACKOFF = 1.0  # seconds
+
+
+async def _fetch_tfnsw(url: str, headers: dict, params: dict) -> httpx.Response:
+    """Fetch from TfNSW API with timeout and jittered exponential backoff.
+
+    Retries on network-level failures (timeout, connection error) only.
+    Non-2xx responses are returned as-is — the caller decides what to do.
+    """
+    for attempt in range(1, _MAX_RETRIES + 1):
+        try:
+            return await _http_client.get(url, headers=headers, params=params)
+        except (httpx.TimeoutException, httpx.ConnectError) as e:
+            if attempt == _MAX_RETRIES:
+                raise UpstreamUnavailableError(
+                    f"TfNSW unreachable after {_MAX_RETRIES} attempts: {e}"
+                )
+            delay = _BASE_BACKOFF * (2 ** (attempt - 1)) + random.uniform(0, 0.5)
+            logger.warning(
+                "TfNSW fetch attempt %d/%d failed (%s). Retrying in %.1fs",
+                attempt, _MAX_RETRIES, e, delay,
+            )
+            await asyncio.sleep(delay)
+
+
+async def get_departures(stop_id: str = "200060"):
     headers = {
         "Authorization": f"apikey {API_KEY}"
     }
@@ -38,8 +68,7 @@ def get_departures(stop_id: str = "200060"):
         "numberOfResultsDeparture": "100",
     }
 
-    # if unsuccessful response
-    response = requests.get(BASE_URL, headers=headers, params=params)
+    response = await _fetch_tfnsw(BASE_URL, headers=headers, params=params)
     if response.status_code != 200:
         raise UpstreamUnavailableError(response.text)
     data = response.json()

@@ -4,13 +4,11 @@ Standalone polling worker — runs as a separate process from the API.
 Usage:
     python worker.py
 
-This polls all tracked stations every 60 seconds and upserts departure
-data into the database. Keeping this separate from the FastAPI process
-means the API can scale independently (multiple uvicorn workers) without
-spawning duplicate pollers.
+Polls all tracked stations concurrently (bounded by SEMAPHORE_LIMIT) every
+POLL_INTERVAL seconds and upserts departure data into the database.
 """
 
-import time
+import asyncio
 import logging
 from services import get_departures
 
@@ -55,22 +53,36 @@ STATIONS = {
     "Auburn": "214410",
 }
 
-POLL_INTERVAL = 60  # seconds
+POLL_INTERVAL = 60   # seconds between full poll cycles
+SEMAPHORE_LIMIT = 6  # max concurrent TfNSW requests
 
 
-def poll_all_stations():
-    for name, stop_id in STATIONS.items():
+async def _poll_stop(name: str, stop_id: str, semaphore: asyncio.Semaphore) -> None:
+    async with semaphore:
         try:
-            get_departures(stop_id)
+            await get_departures(stop_id)
         except Exception as e:
             logger.error("Failed to poll %s (%s): %s", name, stop_id, e)
 
 
-if __name__ == "__main__":
-    logger.info("Worker started — polling %d stations every %ds", len(STATIONS), POLL_INTERVAL)
+async def poll_all_stations() -> None:
+    semaphore = asyncio.Semaphore(SEMAPHORE_LIMIT)
+    tasks = [
+        _poll_stop(name, stop_id, semaphore)
+        for name, stop_id in STATIONS.items()
+    ]
+    await asyncio.gather(*tasks)
+
+
+async def _run() -> None:
+    logger.info(
+        "Worker started — polling %d stations every %ds (%d concurrent)",
+        len(STATIONS), POLL_INTERVAL, SEMAPHORE_LIMIT,
+    )
     while True:
-        try:
-            poll_all_stations()
-        except Exception as e:
-            logger.error("Poll cycle failed: %s", e)
-        time.sleep(POLL_INTERVAL)
+        await poll_all_stations()
+        await asyncio.sleep(POLL_INTERVAL)
+
+
+if __name__ == "__main__":
+    asyncio.run(_run())
