@@ -4,12 +4,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func, Integer
 from database import engine, SessionLocal
 from models import Departure
-from exceptions import UpstreamUnavailableError
 from schemas import DepartureOut
-from services import get_departures
 from typing import Optional
+from datetime import datetime, timezone, timedelta
 import asyncio
-import re
 
 
 async def _poll_loop():
@@ -43,12 +41,40 @@ app.add_middleware(
 def root():
     return {"message": "RailVision API is running"}
 
+def _query_departures(stop_id: str, rail_only: bool = False) -> list[dict]:
+    """Read upcoming departures for a stop from the database."""
+    db = SessionLocal()
+    try:
+        window_start = datetime.now(timezone.utc) - timedelta(minutes=5)
+        query = (
+            db.query(Departure)
+            .filter(Departure.stop_id == stop_id)
+            .filter(Departure.scheduled >= window_start)
+        )
+        if rail_only:
+            query = query.filter(Departure.is_rail.is_(True))
+        rows = query.order_by(Departure.scheduled).all()
+        return [
+            {
+                "line": r.line,
+                "lineName": r.line_name,
+                "destination": r.destination,
+                "operator": r.operator,
+                "platform": r.platform,
+                "scheduled_dt": r.scheduled.isoformat() if r.scheduled else None,
+                "estimated_dt": r.estimated.isoformat() if r.estimated else None,
+                "delay_min": r.delay_min,
+                "realtime": r.realtime,
+            }
+            for r in rows
+        ]
+    finally:
+        db.close()
+
+
 @app.get("/departures/{stop_id}", response_model=list[DepartureOut])
 def departures(stop_id: str):
-    try:
-        return get_departures(stop_id)
-    except UpstreamUnavailableError as e:
-        raise HTTPException(status_code=502, detail=e.message)
+    return _query_departures(stop_id)
 
 @app.get("/analytics/delays/by-line")
 def delay_by_lines(stop_id: Optional[str] = None):
@@ -153,12 +179,7 @@ def delays_by_hour(stop_id: Optional[str] = None):
 
 @app.get("/departures/live/{stop_id}", response_model=list[DepartureOut])
 def live_departures(stop_id: str):
-    try:
-        deps = get_departures(stop_id)
-    except UpstreamUnavailableError as e:
-        raise HTTPException(status_code=502, detail=e.message)
-    filtered = [d for d in deps if re.match(r'^[TLMS]\d$', str(d.get("line", "")))]
-    return sorted(filtered, key=lambda x: x.get("scheduled_dt", ""))
+    return _query_departures(stop_id, rail_only=True)
 
 @app.get("/analytics/delays/by-day-hour")
 def delays_by_day_hour(stop_id: Optional[str] = None):
