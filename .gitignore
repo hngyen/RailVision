@@ -53,7 +53,8 @@ coverage.xml
 cover/
 
 .claude
-
+railway.json
+railvision_backup.dump
 # Translations
 *.mo
 *.pot
