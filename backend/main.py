@@ -1,15 +1,11 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import Response
-from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func, Integer
-import os
 from database import engine, SessionLocal
 from models import Departure
 from exceptions import UpstreamUnavailableError
 from schemas import DepartureOut
 from services import get_departures
-from config import API_KEY, BASE_URL
 from typing import Optional
 import re
 
@@ -24,53 +20,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-STATIONS = {
-    "Cabramatta": "216620",
-    "Liverpool": "217010",
-    "Central": "200060",
-    "Town Hall": "200070",
-    "Redfern": "201510",
-    "Parramatta": "215020",
-    "Wynyard": "200080",
-    "Strathfield": "213510",
-    "Martin Place": "200090",
-    "Chatswood": "206710",
-    "Circular Quay": "200010",
-    "Bondi Junction": "202220",
-    "Burwood": "213410",
-    "Gadigal": "2000434",
-    "North Sydney": "206010",
-    "Hurstville": "222010",
-    "Wolli Creek": "220510",
-    "Blacktown": "214810",
-    "Epping": "212110",
-    "Mascot": "202010",
-    "Green Square": "201710",
-    "Victoria Cross": "2060444",
-    "Ashfield": "213110",
-    "Seven Hills": "214710",
-    "Sydenham": "204410",
-    "Lidcombe": "214110",
-    "Museum": "200040",
-    "St James": "200050",
-    "Kings Cross": "201110",
-    "Hornsby": "207710",
-    "Rhodes": "213810",
-    "Auburn": "214410",
-}
-
-# background polling job
-def poll_departures():
-    for name, stop_id in STATIONS.items():
-        get_departures(stop_id)
-
-ENABLE_SCHEDULER = os.getenv("RAILVISION_ENABLE_SCHEDULER", "1").lower() in {"1", "true", "yes"}
-
-if ENABLE_SCHEDULER:
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(poll_departures, "interval", seconds=60)
-    scheduler.start()
 
 @app.api_route("/", methods=["GET", "HEAD"])
 def root():
