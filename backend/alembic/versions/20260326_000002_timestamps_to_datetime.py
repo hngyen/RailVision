@@ -22,7 +22,17 @@ def upgrade() -> None:
     conn = op.get_bind()
 
     if conn.dialect.name == "postgresql":
-        # Postgres: ALTER COLUMN TYPE in-place, USING clause converts data
+        # Drop unique constraint so type conversion doesn't collide on duplicates
+        op.drop_constraint("unique_departure", "departures", type_="unique")
+
+        # Deduplicate: keep only the row with the latest fetched_at per logical trip
+        op.execute(
+            "DELETE FROM departures d1 USING departures d2 "
+            "WHERE d1.line = d2.line AND d1.scheduled = d2.scheduled "
+            "AND d1.stop_id = d2.stop_id AND d1.fetched_at < d2.fetched_at"
+        )
+
+        # Now safe to convert types
         op.execute(
             "ALTER TABLE departures "
             "ALTER COLUMN scheduled TYPE TIMESTAMPTZ USING scheduled::timestamptz"
@@ -35,6 +45,9 @@ def upgrade() -> None:
             "ALTER TABLE departures "
             "ALTER COLUMN fetched_at TYPE TIMESTAMPTZ USING fetched_at::timestamptz"
         )
+
+        # Re-add unique constraint on the now-clean data
+        op.create_unique_constraint("unique_departure", "departures", ["line", "scheduled", "stop_id"])
     else:
         # SQLite: recreate table with new column types via batch
         with op.batch_alter_table("departures", schema=None) as batch_op:

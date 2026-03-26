@@ -1,3 +1,4 @@
+import re
 import requests
 import pandas as pd
 import math
@@ -9,6 +10,8 @@ import pytz
 
 
 from config import API_KEY, BASE_URL
+
+RAIL_PATTERN = re.compile(r'^[TLMS]\d$')
 from database import SessionLocal, engine
 from exceptions import UpstreamUnavailableError
 from models import Departure
@@ -95,6 +98,7 @@ def get_departures(stop_id: str = "200060"):
                 "realtime": bool(row["realtime"]),
                 "stop_id": stop_id,
                 "fetched_at": fetched_at,
+                "is_rail": bool(RAIL_PATTERN.match(row["line"] or "")),
             }
             for _, row in df.iterrows()
         ]

@@ -17,6 +17,7 @@ class Departure(Base):
     realtime = Column(Boolean)
     stop_id = Column(String)
     fetched_at = Column(DateTime(timezone=True))
+    is_rail = Column(Boolean, nullable=False, default=False)
 
     __table_args__ = (
         UniqueConstraint('line', 'scheduled', 'stop_id', name='unique_departure'),

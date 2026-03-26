@@ -92,7 +92,7 @@ def delay_by_lines(stop_id: Optional[str] = None):
             func.avg(Departure.delay_min).label("avg_delay"),
             func.count(Departure.id).label("total_trips"),
             func.sum((Departure.delay_min > 1).cast(Integer)).label("delayed_trips"),
-        ).filter(Departure.line.op('~')('^[TLMS][0-9]$'))
+        ).filter(Departure.is_rail.is_(True))
 
         if stop_id:
             query = query.filter(Departure.stop_id == stop_id)
@@ -128,7 +128,7 @@ def worst_lines(stop_id: Optional[str] = None):
                 func.sum((Departure.delay_min > 1).cast(Integer)).label("delayed_trips"),
             )
             .group_by(Departure.line, Departure.line_name)
-            .filter(Departure.line.op('~')('^[TLMS][0-9]$'))
+            .filter(Departure.is_rail.is_(True))
         )
         if stop_id:
             query = query.filter(Departure.stop_id == stop_id)
@@ -166,7 +166,7 @@ def delays_by_hour(stop_id: Optional[str] = None):
                 hour_expr.label("hour"),
                 func.avg(Departure.delay_min).label("avg_delay"),
                 func.count(Departure.id).label("total_trips"),
-            ).filter(Departure.line.op('~')('^[TLMS][0-9]$'))
+            ).filter(Departure.is_rail.is_(True))
         )
 
         if stop_id:
@@ -219,7 +219,7 @@ def delays_by_day_hour(stop_id: Optional[str] = None):
                 func.avg(Departure.delay_min).label("avg_delay"),
                 func.count(Departure.id).label("total_trips"),
             )
-            .filter(Departure.line.op('~')('^[TLMS][0-9]$'))
+            .filter(Departure.is_rail.is_(True))
         )
         if stop_id:
             query = query.filter(Departure.stop_id == stop_id)
@@ -247,7 +247,7 @@ def stations_summary():
                 func.avg(Departure.delay_min).label("avg_delay"),
                 func.count(Departure.id).label("total_trips"),
             )
-            .filter(Departure.line.op('~')('^[TLMS][0-9]$'))
+            .filter(Departure.is_rail.is_(True))
             .group_by(Departure.stop_id)
             .all()
         )
@@ -259,7 +259,7 @@ def stations_summary():
                 Departure.line,
                 func.avg(Departure.delay_min).label("avg_delay"),
             )
-            .filter(Departure.line.op('~')('^[TLMS][0-9]$'))
+            .filter(Departure.is_rail.is_(True))
             .group_by(Departure.stop_id, Departure.line)
             .order_by(Departure.stop_id, func.avg(Departure.delay_min).desc())
             .all()
