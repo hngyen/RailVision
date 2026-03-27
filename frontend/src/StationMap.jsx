@@ -50,6 +50,11 @@ export default function StationMap({ stationStats, selectedStation, onStationSel
     const markersRef = useRef({})
     const previousSelectedRef = useRef(null)
     const isMarkerClickRef = useRef(false)
+    const onStationSelectRef = useRef(onStationSelect)
+
+    useEffect(() => {
+      onStationSelectRef.current = onStationSelect
+    }, [onStationSelect])
 
     useEffect(() => {
       if (!mapInstanceRef.current || !selectedStation) return
@@ -101,7 +106,7 @@ export default function StationMap({ stationStats, selectedStation, onStationSel
         .bindPopup(`<div style="font-family: monospace; font-size: 0.75rem"><strong>${station.name}</strong><br/>Loading…</div>`)
         .on('click', () => {
           isMarkerClickRef.current = true
-          onStationSelect({ id: stopId, name: station.name })
+          onStationSelectRef.current({ id: stopId, name: station.name })
         })
         .addTo(map)
 
@@ -112,7 +117,7 @@ export default function StationMap({ stationStats, selectedStation, onStationSel
         map.remove()
         mapInstanceRef.current = null
       }
-    }, [onStationSelect])
+    }, [])
 
     // Update marker styles and popups whenever stationStats refreshes.
     // Runs independently of map init — never tears down the map.

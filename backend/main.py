@@ -52,7 +52,7 @@ def _query_departures(stop_id: str, rail_only: bool = False) -> list[dict]:
     """Read upcoming departures for a stop from the database."""
     db = SessionLocal()
     try:
-        window_start = datetime.now(timezone.utc) - timedelta(minutes=5)
+        window_start = datetime.now(timezone.utc) - timedelta(seconds=70)
         query = (
             db.query(Departure)
             .filter(Departure.stop_id == stop_id)
