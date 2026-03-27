@@ -54,30 +54,22 @@ STATIONS = {
 }
 
 POLL_INTERVAL = 60   # seconds between full poll cycles
-SEMAPHORE_LIMIT = 6  # max concurrent TfNSW requests
+INTER_REQUEST_DELAY = 1.0  # seconds between each station request
 
 
-async def _poll_stop(name: str, stop_id: str, semaphore: asyncio.Semaphore) -> None:
-    async with semaphore:
+async def poll_all_stations() -> None:
+    for name, stop_id in STATIONS.items():
         try:
             await get_departures(stop_id)
         except Exception as e:
             logger.error("Failed to poll %s (%s): %s", name, stop_id, e)
-
-
-async def poll_all_stations() -> None:
-    semaphore = asyncio.Semaphore(SEMAPHORE_LIMIT)
-    tasks = [
-        _poll_stop(name, stop_id, semaphore)
-        for name, stop_id in STATIONS.items()
-    ]
-    await asyncio.gather(*tasks)
+        await asyncio.sleep(INTER_REQUEST_DELAY)
 
 
 async def _run() -> None:
     logger.info(
-        "Worker started — polling %d stations every %ds (%d concurrent)",
-        len(STATIONS), POLL_INTERVAL, SEMAPHORE_LIMIT,
+        "Worker started — polling %d stations every %ds (~%ds per cycle)",
+        len(STATIONS), POLL_INTERVAL, len(STATIONS) * INTER_REQUEST_DELAY,
     )
     while True:
         await poll_all_stations()
