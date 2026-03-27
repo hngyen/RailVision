@@ -75,9 +75,12 @@ async def _get_departures_inner(stop_id: str):
     }
 
     response = await _fetch_tfnsw(BASE_URL, headers=headers, params=params)
+    if response.status_code == 429:
+        upstream_errors_total.labels(stop_id=stop_id).inc()
+        raise UpstreamUnavailableError("RATE_LIMITED")
     if response.status_code != 200:
         upstream_errors_total.labels(stop_id=stop_id).inc()
-        raise UpstreamUnavailableError(response.text)
+        raise UpstreamUnavailableError(f"HTTP {response.status_code}: {response.text[:200]}")
     data = response.json()
 
     departures = []

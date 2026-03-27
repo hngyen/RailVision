@@ -63,7 +63,7 @@ async def poll_all_stations() -> None:
             await get_departures(stop_id)
         except Exception as e:
             msg = str(e)
-            if "rate limit" in msg.lower() or "quota" in msg.lower() or "over rate" in msg.lower():
+            if "RATE_LIMITED" in msg:
                 logger.warning("Rate limited by TfNSW — pausing poll cycle for 60s")
                 await asyncio.sleep(60)
                 return
