@@ -54,7 +54,7 @@ STATIONS = {
 }
 
 POLL_INTERVAL = 60   # seconds between full poll cycles
-INTER_REQUEST_DELAY = 1.0  # seconds between each station request
+INTER_REQUEST_DELAY = 2.0  # seconds between each station request
 
 
 async def poll_all_stations() -> None:
@@ -62,6 +62,11 @@ async def poll_all_stations() -> None:
         try:
             await get_departures(stop_id)
         except Exception as e:
+            msg = str(e)
+            if "rate limit" in msg.lower() or "quota" in msg.lower() or "over rate" in msg.lower():
+                logger.warning("Rate limited by TfNSW — pausing poll cycle for 60s")
+                await asyncio.sleep(60)
+                return
             logger.error("Failed to poll %s (%s): %s", name, stop_id, e)
         await asyncio.sleep(INTER_REQUEST_DELAY)
 
