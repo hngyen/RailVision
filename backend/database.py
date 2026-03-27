@@ -1,4 +1,6 @@
 import os
+import shlex
+from urllib.parse import quote, urlencode
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 from pathlib import Path
@@ -13,6 +15,32 @@ def _normalize_database_url(raw_url: str | None) -> str | None:
     if url.startswith("postgres://"):
         # SQLAlchemy expects postgresql://
         url = "postgresql://" + url[len("postgres://") :]
+    if url.startswith("postgresql:") and not url.startswith("postgresql://"):
+        url = "postgresql://" + url[len("postgresql:") :].lstrip("/")
+    if "://" not in url and "=" in url:
+        # Accept libpq-style DSN: host=... port=... user=... password=... dbname=...
+        parts: dict[str, str] = {}
+        for token in shlex.split(url):
+            if "=" not in token:
+                continue
+            k, v = token.split("=", 1)
+            if k:
+                parts[k.strip()] = v.strip()
+        host = parts.get("host")
+        dbname = parts.get("dbname") or parts.get("database")
+        user = parts.get("user")
+        password = parts.get("password", "")
+        if host and dbname and user:
+            port = parts.get("port")
+            netloc = host if not port else f"{host}:{port}"
+            auth = f"{quote(user, safe='')}:{quote(password, safe='')}@"
+            query_params = {
+                k: v
+                for k, v in parts.items()
+                if k not in {"host", "port", "dbname", "database", "user", "password"}
+            }
+            query = f"?{urlencode(query_params)}" if query_params else ""
+            url = f"postgresql://{auth}{netloc}/{dbname}{query}"
     return url
 
 
