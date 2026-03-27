@@ -10,6 +10,18 @@ from schemas import DepartureOut
 from typing import Optional
 from datetime import datetime, timezone, timedelta
 import asyncio
+import os
+import logging
+
+
+logger = logging.getLogger(__name__)
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 async def _poll_loop():
@@ -23,6 +35,11 @@ async def _poll_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if not _env_bool("RUN_POLLER", True):
+        logger.info("RUN_POLLER=false; startup poll loop disabled for this process")
+        yield
+        return
+
     task = asyncio.create_task(_poll_loop())
     yield
     task.cancel()

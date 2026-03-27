@@ -10,6 +10,7 @@ data into the database.
 
 import asyncio
 import logging
+import os
 from sqlalchemy import text
 from services import get_departures
 from database import engine
@@ -19,6 +20,13 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 STATIONS = {
     "Cabramatta": "216620",
@@ -118,6 +126,11 @@ async def poll_all_stations() -> None:
 
 
 async def _run() -> None:
+    if not _env_bool("RUN_POLLER", True):
+        logger.info("RUN_POLLER=false; worker polling disabled")
+        while True:
+            await asyncio.sleep(3600)
+
     logger.info(
         "Worker started — polling %d stations every %ds (~%ds per cycle)",
         len(STATIONS), POLL_INTERVAL, len(STATIONS) * INTER_REQUEST_DELAY,
