@@ -4,13 +4,15 @@ Standalone polling worker — runs as a separate process from the API.
 Usage:
     python worker.py
 
-Polls all tracked stations concurrently (bounded by SEMAPHORE_LIMIT) every
-POLL_INTERVAL seconds and upserts departure data into the database.
+Polls all tracked stations every POLL_INTERVAL seconds and upserts departure
+data into the database.
 """
 
 import asyncio
 import logging
+from sqlalchemy import text
 from services import get_departures
+from database import engine
 
 logging.basicConfig(
     level=logging.INFO,
@@ -55,20 +57,64 @@ STATIONS = {
 
 POLL_INTERVAL = 60   # seconds between full poll cycles
 INTER_REQUEST_DELAY = 2.0  # seconds between each station request
+_rate_limit_backoff = 60  # grows on consecutive rate limits
+_POLL_LOCK_ID = 220032022  # shared lock id for all poller instances
+
+
+def _acquire_poll_lock():
+    if engine.dialect.name != "postgresql":
+        return None
+
+    conn = engine.connect()
+    locked = bool(
+        conn.execute(
+            text("SELECT pg_try_advisory_lock(:lock_id)"),
+            {"lock_id": _POLL_LOCK_ID},
+        ).scalar()
+    )
+    if not locked:
+        conn.close()
+        return False
+    return conn
+
+
+def _release_poll_lock(conn) -> None:
+    if not conn:
+        return
+    try:
+        conn.execute(
+            text("SELECT pg_advisory_unlock(:lock_id)"),
+            {"lock_id": _POLL_LOCK_ID},
+        )
+    finally:
+        conn.close()
 
 
 async def poll_all_stations() -> None:
-    for name, stop_id in STATIONS.items():
-        try:
-            await get_departures(stop_id)
-        except Exception as e:
-            msg = str(e)
-            if "RATE_LIMITED" in msg:
-                logger.warning("Rate limited by TfNSW — pausing poll cycle for 60s")
-                await asyncio.sleep(60)
-                return
-            logger.error("Failed to poll %s (%s): %s", name, stop_id, e)
-        await asyncio.sleep(INTER_REQUEST_DELAY)
+    global _rate_limit_backoff
+    lock_conn = _acquire_poll_lock()
+    if lock_conn is False:
+        logger.info("Skipping poll cycle (another instance holds the poll lock)")
+        return
+
+    try:
+        for name, stop_id in STATIONS.items():
+            try:
+                await get_departures(stop_id)
+                _rate_limit_backoff = 60  # reset on success
+            except Exception as e:
+                msg = str(e)
+                if "RATE_LIMITED" in msg:
+                    logger.warning(
+                        "Rate limited by TfNSW — backing off %ds", _rate_limit_backoff
+                    )
+                    await asyncio.sleep(_rate_limit_backoff)
+                    _rate_limit_backoff = min(_rate_limit_backoff * 2, 600)  # cap at 10min
+                    return
+                logger.error("Failed to poll %s (%s): %s", name, stop_id, e)
+            await asyncio.sleep(INTER_REQUEST_DELAY)
+    finally:
+        _release_poll_lock(lock_conn)
 
 
 async def _run() -> None:

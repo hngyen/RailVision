@@ -15,6 +15,7 @@ import asyncio
 async def _poll_loop():
     """Run the worker polling loop as a background asyncio task."""
     from worker import poll_all_stations, POLL_INTERVAL
+    await asyncio.sleep(10)  # let the app finish startup before first poll
     while True:
         await poll_all_stations()
         await asyncio.sleep(POLL_INTERVAL)

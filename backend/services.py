@@ -11,7 +11,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 import pytz
 
-from config import API_KEY, BASE_URL
+from config import API_KEY, BASE_URL, RESULTS_PER_STOP
 from database import SessionLocal, engine
 from exceptions import UpstreamUnavailableError
 from metrics import poll_duration_seconds, upstream_errors_total, events_ingested_total, db_write_duration_seconds
@@ -53,6 +53,32 @@ async def get_departures(stop_id: str = "200060"):
         return await _get_departures_inner(stop_id)
 
 
+def _rate_limit_context(response: httpx.Response) -> dict[str, str]:
+    headers = getattr(response, "headers", {}) or {}
+    return {
+        "retry_after": headers.get("Retry-After", ""),
+        "limit": headers.get("X-RateLimit-Limit", ""),
+        "remaining": headers.get("X-RateLimit-Remaining", ""),
+        "reset": headers.get("X-RateLimit-Reset", ""),
+        "error_detail": headers.get("X-Error-Detail", ""),
+    }
+
+
+def _looks_rate_limited(response: httpx.Response) -> bool:
+    if response.status_code == 429:
+        return True
+    if response.status_code != 403:
+        return False
+    headers = getattr(response, "headers", {}) or {}
+    joined = " ".join(
+        [
+            headers.get("X-Error-Detail", ""),
+            response.text[:300],
+        ]
+    ).lower()
+    return any(token in joined for token in ("rate", "quota", "too many"))
+
+
 async def _get_departures_inner(stop_id: str):
     headers = {
         "Authorization": f"apikey {API_KEY}"
@@ -71,11 +97,25 @@ async def _get_departures_inner(stop_id: str):
         "itdDate": now.strftime("%Y%m%d"),
         "itdTime": now.strftime("%H%M"),
         "mode": "direct",
-        "numberOfResultsDeparture": "100",
+        "numberOfResultsDeparture": RESULTS_PER_STOP,
     }
 
     response = await _fetch_tfnsw(BASE_URL, headers=headers, params=params)
-    if response.status_code == 429:
+    if response.status_code != 200:
+        ctx = _rate_limit_context(response)
+        body_sample = (response.text or "")[:200].replace("\n", " ")
+        logger.warning(
+            "TfNSW non-200 stop_id=%s status=%s retry_after=%s remaining=%s limit=%s reset=%s detail=%s body=%s",
+            stop_id,
+            response.status_code,
+            ctx["retry_after"] or "-",
+            ctx["remaining"] or "-",
+            ctx["limit"] or "-",
+            ctx["reset"] or "-",
+            ctx["error_detail"] or "-",
+            body_sample,
+        )
+    if _looks_rate_limited(response):
         upstream_errors_total.labels(stop_id=stop_id).inc()
         raise UpstreamUnavailableError("RATE_LIMITED")
     if response.status_code != 200:
