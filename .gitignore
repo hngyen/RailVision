@@ -155,6 +155,9 @@ venv.bak/
 # Rope project settings
 .ropeproject
 
+PLAN.md
+railvision_backup.dump
+railway.json
 
 # mkdocs documentation
 /site
