@@ -94,7 +94,7 @@ RailVision ingests live departure data from 31 Sydney train stations via the Tra
 |-------|-----------|
 | Backend | Python, FastAPI, Uvicorn |
 | Worker | Standalone async process, httpx with retry/backoff |
-| Database | PostgreSQL (Supabase) |
+| Database | PostgreSQL (DigitalOcean) |
 | Cache / State | Redis (DigitalOcean managed) |
 | Real-time | WebSocket (FastAPI) + Redis Pub/Sub |
 | ORM | SQLAlchemy 2.0, Alembic migrations |
