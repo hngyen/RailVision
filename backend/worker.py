@@ -112,9 +112,12 @@ async def poll_all_stations() -> None:
                 departures = await get_departures(stop_id)
                 _rate_limit_backoff = 60  # reset on success
 
-                # Write current state to Redis + publish changes
+                # Write rail-only state to Redis + publish changes
                 if departures:
-                    await redis_state.update_trips(stop_id, departures)
+                    from services import RAIL_PATTERN
+                    rail_only = [d for d in departures if RAIL_PATTERN.match(d.get("line") or "")]
+                    if rail_only:
+                        await redis_state.update_trips(stop_id, rail_only)
             except Exception as e:
                 msg = str(e)
                 if "RATE_LIMITED" in msg:
