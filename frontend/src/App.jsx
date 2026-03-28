@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef, useCallback } from "react"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts"
 import Heatmap from "./Heatmap"
 import StationMap from "./StationMap"
@@ -163,16 +163,24 @@ export default function App() {
   const [liveDeps, setLiveDeps] = useState([]);
   const [stationStats, setStationStats] = useState({})
   const [activeTab, setActiveTab] = useState("overview")
+  const [wsStatus, setWsStatus] = useState("disconnected") // "connected" | "disconnected" | "connecting"
+  const wsRef = useRef(null)
+  const reconnectTimer = useRef(null)
   const tabs = ["overview", "analytics"]
   const API = "https://railvision-app-jpl5c.ondigitalocean.app";
-
-  const filteredStations = STATIONS.filter(s => 
-    s.name.toLowerCase().includes("")
-  )
+  const WS_URL = API.replace(/^http/, "ws") + "/ws";
 
   const handleStationChange = (station) => {
     setSelectedStation(station)
   }
+
+  // Fetch just live departures (called on WS events — fast, reads from Redis)
+  const fetchLive = useCallback(() => {
+    fetch(`${API}/departures/live/${selectedStation.id}`)
+      .then(r => r.json())
+      .then(live => setLiveDeps(Array.isArray(live) ? live : []))
+      .catch(() => {})
+  }, [selectedStation.id])
 
   const fetchData = () => {
       setLoading(true);
@@ -195,9 +203,51 @@ export default function App() {
       })
     }
 
+  // WebSocket connection — reconnects on station change and on drop
+  useEffect(() => {
+    let ws;
+    const connect = () => {
+      setWsStatus("connecting")
+      ws = new WebSocket(`${WS_URL}/${selectedStation.id}`)
+
+      ws.onopen = () => {
+        setWsStatus("connected")
+      }
+
+      ws.onmessage = () => {
+        // Any event for this station = re-fetch live departures from Redis
+        fetchLive()
+      }
+
+      ws.onclose = () => {
+        setWsStatus("disconnected")
+        // Reconnect after 5s
+        reconnectTimer.current = setTimeout(connect, 5000)
+      }
+
+      ws.onerror = () => {
+        ws.close()
+      }
+
+      wsRef.current = ws
+    }
+
+    connect()
+
+    return () => {
+      clearTimeout(reconnectTimer.current)
+      if (wsRef.current) {
+        wsRef.current.onclose = null // prevent reconnect on intentional close
+        wsRef.current.close()
+      }
+      setWsStatus("disconnected")
+    }
+  }, [selectedStation.id, fetchLive])
+
+  // Full data fetch on station change + slower polling fallback (5 min instead of 60s)
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 60000);
+    const interval = setInterval(fetchData, 300000);
     return () => clearInterval(interval);
   }, [selectedStation])
     
@@ -232,8 +282,16 @@ export default function App() {
                 <span style={{ color: "var(--color-secondary)", fontSize: "1rem", letterSpacing: "0.1em" }}>NSW TRAINS ANALYTICS</span>
               </div>
               <div style={{ color: "var(--color-secondary)", fontSize: "0.75rem", letterSpacing: "0.08em", textAlign: "right" }}>
-                <div>LIVE DATA<span className="live-indicator"></span></div>
-                <div>UPDATES EVERY 60S</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "0.5rem" }}>
+                  <span style={{
+                    width: "6px", height: "6px", borderRadius: "50%",
+                    background: wsStatus === "connected" ? "var(--color-success)" : wsStatus === "connecting" ? "var(--color-warning)" : "var(--color-danger)",
+                    boxShadow: wsStatus === "connected" ? "0 0 6px var(--color-success)" : "none",
+                    display: "inline-block"
+                  }} />
+                  {wsStatus === "connected" ? "LIVE" : wsStatus === "connecting" ? "CONNECTING" : "OFFLINE"}
+                </div>
+                <div>{wsStatus === "connected" ? "REAL-TIME UPDATES" : "POLLING FALLBACK"}</div>
               </div>
             </div>
           </div>
@@ -443,7 +501,7 @@ export default function App() {
           </div>
 
           <div style={{ color: "var(--color-footer)", fontSize: "0.65rem", marginTop: "1.5rem", letterSpacing: "0.08em" }}>
-            DATA SOURCE: TRANSPORT FOR NSW OPEN DATA // POLLING INTERVAL 60S
+            DATA SOURCE: TRANSPORT FOR NSW OPEN DATA // {wsStatus === "connected" ? "WEBSOCKET LIVE" : "POLLING FALLBACK"}
           </div>
         </div>
       </>

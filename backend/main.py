@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
@@ -11,6 +11,7 @@ from datetime import datetime, timezone, timedelta
 import logging
 
 import redis_state
+from ws_manager import manager
 
 logger = logging.getLogger(__name__)
 
@@ -268,3 +269,18 @@ def stations_summary():
         }
     finally:
         db.close()
+
+
+@app.websocket("/ws/{stop_id}")
+async def websocket_endpoint(websocket: WebSocket, stop_id: str):
+    """Stream real-time departure updates for a station.
+
+    Client connects, receives JSON events whenever the worker detects
+    a change (new trip, delay update) for the subscribed stop_id.
+    """
+    await manager.connect(websocket, stop_id)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, stop_id)
