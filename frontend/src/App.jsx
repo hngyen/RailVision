@@ -255,22 +255,15 @@ export default function App() {
   const avgDelay = Array.isArray(delays) && delays.length ? (delays.reduce((s, l) => s + l.avg_delay_min, 0) / delays.length).toFixed(2) : 0
   const worstLine = Array.isArray(delays) && delays[0]?.line ? delays[0].line : "—"
   
-  // calculate daily average, bc railvision collection not uniform
-  const getDaysTracked = () => {
-    const trackingDates = {
-      "200060": 4, // Central: March 1-4 = 4 days
-      "default": 2  // Others: March 3-4 = 2 days
-    }
-    return trackingDates[selectedStation.id] || trackingDates.default
-  }
-  const dailyAvg = totalTrips > 0 ? (totalTrips / getDaysTracked()).toFixed(0) : 0
-  const daysTracked = getDaysTracked()
-  const hasHistoricalData = dailyAvg >= 5  // threshold for realistic data
+  // Days tracked = days since first data collection (March 1 2026)
+  const daysTracked = Math.max(1, Math.floor((Date.now() - new Date("2026-03-01").getTime()) / 86400000))
+  const dailyAvg = totalTrips > 0 ? (totalTrips / daysTracked).toFixed(0) : 0
+  const hasHistoricalData = totalTrips >= 20
 
   return (
       <>
-        {/* Progress bar */}
-        <div className="progress-bar"></div>
+        {/* Progress bar — only show when WS is disconnected and polling */}
+        {wsStatus !== "connected" && <div className="progress-bar"></div>}
 
         <div style={{ minHeight: "100vh", background: "var(--color-background)", color: "var(--color-text)", fontFamily: "'Courier New', monospace", padding: "2.5rem" }}>
           
