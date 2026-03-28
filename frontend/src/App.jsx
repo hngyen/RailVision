@@ -255,8 +255,8 @@ export default function App() {
   const avgDelay = Array.isArray(delays) && delays.length ? (delays.reduce((s, l) => s + l.avg_delay_min, 0) / delays.length).toFixed(2) : 0
   const worstLine = Array.isArray(delays) && delays[0]?.line ? delays[0].line : "—"
   
-  // Days tracked = days since first data collection (March 1 2026)
-  const daysTracked = Math.max(1, Math.floor((Date.now() - new Date("2026-03-01").getTime()) / 86400000))
+  // Days tracked = days since first data collection (March 27 2026)
+  const daysTracked = Math.max(1, Math.floor((Date.now() - new Date("2026-03-27").getTime()) / 86400000))
   const dailyAvg = totalTrips > 0 ? (totalTrips / daysTracked).toFixed(0) : 0
   const hasHistoricalData = totalTrips >= 20
 
@@ -356,7 +356,7 @@ export default function App() {
               <div style={{ marginBottom: "0.5rem" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
                   <span style={{ color: "var(--color-text-tertiary)", fontSize: "0.7rem", letterSpacing: "0.15em", textTransform: "uppercase" }}>Stats Info</span>
-                  <span title="Central: tracking since March 1. Other stations: tracking since March 3." style={{ cursor: "help", color: ACCENT, fontSize: "0.8rem", width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${ACCENT}`, borderRadius: "50%", fontWeight: "bold", flexShrink: 0 }}>?</span>
+                  <span title="Tracking since March 27, 2026." style={{ cursor: "help", color: ACCENT, fontSize: "0.8rem", width: "18px", height: "18px", display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${ACCENT}`, borderRadius: "50%", fontWeight: "bold", flexShrink: 0 }}>?</span>
                 </div>
               </div>
               <div className="stat-cards-container">
