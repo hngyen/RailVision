@@ -63,7 +63,7 @@ STATIONS = {
     "Auburn": "214410",
 }
 
-POLL_INTERVAL = 60   # seconds between full poll cycles
+POLL_INTERVAL = 15   # seconds between full poll cycles
 INTER_REQUEST_DELAY = 1.0  # seconds between each station request
 _rate_limit_backoff = 60  # grows on consecutive rate limits
 _POLL_LOCK_ID = 220032022  # shared lock id for all poller instances
