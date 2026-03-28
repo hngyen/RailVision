@@ -8,6 +8,11 @@ from models import Departure
 from schemas import DepartureOut
 from typing import Optional
 from datetime import datetime, timezone, timedelta
+import logging
+
+import redis_state
+
+logger = logging.getLogger(__name__)
 
 
 app = FastAPI()
@@ -168,7 +173,12 @@ def delays_by_hour(stop_id: Optional[str] = None):
         db.close()
 
 @app.get("/departures/live/{stop_id}", response_model=list[DepartureOut])
-def live_departures(stop_id: str):
+async def live_departures(stop_id: str):
+    """Read live departures from Redis (fast path), fall back to Postgres."""
+    deps = await redis_state.get_live_departures(stop_id)
+    if deps:
+        return deps
+    logger.debug("Redis empty for stop %s, falling back to Postgres", stop_id)
     return _query_departures(stop_id, rail_only=True)
 
 @app.get("/analytics/delays/by-day-hour")
