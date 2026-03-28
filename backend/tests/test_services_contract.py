@@ -2,6 +2,7 @@ import pytest
 
 import services
 from exceptions import UpstreamUnavailableError
+from datetime import datetime, timezone
 
 
 class FakeResponse:
@@ -36,3 +37,34 @@ async def test_get_departures_empty_events_returns_empty_list(monkeypatch):
     result = await services.get_departures("200060")
 
     assert result == []
+
+
+def test_dedupe_rows_for_upsert_collapses_duplicate_conflict_keys():
+    scheduled = datetime(2026, 3, 28, 6, 22, tzinfo=timezone.utc)
+    rows = [
+        {
+            "line": "T1",
+            "scheduled": scheduled,
+            "stop_id": "213410",
+            "estimated": None,
+            "realtime": False,
+            "platform": None,
+            "destination": "Penrith",
+        },
+        {
+            "line": "T1",
+            "scheduled": scheduled,
+            "stop_id": "213410",
+            "estimated": datetime(2026, 3, 28, 6, 24, tzinfo=timezone.utc),
+            "realtime": True,
+            "platform": "Platform 2",
+            "destination": "Penrith",
+        },
+    ]
+
+    deduped, duplicates = services._dedupe_rows_for_upsert(rows)
+
+    assert duplicates == 1
+    assert len(deduped) == 1
+    assert deduped[0]["realtime"] is True
+    assert deduped[0]["estimated"] is not None

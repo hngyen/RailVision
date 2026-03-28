@@ -53,6 +53,46 @@ async def get_departures(stop_id: str = "200060"):
         return await _get_departures_inner(stop_id)
 
 
+def _row_quality_score(row: dict) -> tuple[int, int]:
+    """Higher score means better candidate to keep for duplicate upsert keys."""
+    quality = 0
+    if row.get("realtime"):
+        quality += 1
+    if row.get("estimated") is not None:
+        quality += 1
+    if row.get("platform"):
+        quality += 1
+    if row.get("destination"):
+        quality += 1
+
+    estimated = row.get("estimated")
+    ts = int(estimated.timestamp()) if estimated is not None else -1
+    return quality, ts
+
+
+def _dedupe_rows_for_upsert(rows: list[dict]) -> tuple[list[dict], int]:
+    """Deduplicate rows by ON CONFLICT key before bulk insert.
+
+    Postgres raises CardinalityViolation when the same conflict key appears
+    multiple times in one INSERT .. ON CONFLICT statement.
+    """
+    deduped: dict[tuple, dict] = {}
+    duplicate_rows = 0
+
+    for row in rows:
+        key = (row.get("line"), row.get("scheduled"), row.get("stop_id"))
+        existing = deduped.get(key)
+        if existing is None:
+            deduped[key] = row
+            continue
+
+        duplicate_rows += 1
+        if _row_quality_score(row) > _row_quality_score(existing):
+            deduped[key] = row
+
+    return list(deduped.values()), duplicate_rows
+
+
 def _rate_limit_context(response: httpx.Response) -> dict[str, str]:
     headers = getattr(response, "headers", {}) or {}
     return {
@@ -179,6 +219,7 @@ async def _get_departures_inner(stop_id: str):
             }
             for _, row in df.iterrows()
         ]
+        rows, duplicate_rows = _dedupe_rows_for_upsert(rows)
 
         insert_fn = pg_insert if engine.dialect.name == "postgresql" else sqlite_insert
         insert_stmt = insert_fn(Departure).values(rows)
@@ -194,7 +235,13 @@ async def _get_departures_inner(stop_id: str):
             db.execute(stmt)
             db.commit()
         events_ingested_total.labels(stop_id=stop_id).inc(len(rows))
-        logger.info("stop_id=%s fetched=%d upserted=%d", stop_id, len(rows), len(rows))
+        logger.info(
+            "stop_id=%s fetched=%d upserted=%d duplicate_rows_dropped=%d",
+            stop_id,
+            len(df),
+            len(rows),
+            duplicate_rows,
+        )
     except Exception as e:
         db.rollback()
         logger.error("DB error for stop %s: %s", stop_id, e)
