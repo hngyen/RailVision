@@ -1,8 +1,8 @@
 # RailVision
 
-**Live NSW Trains analytics dashboard: real-time departure tracking and delay analysis for major train stations across Sydney's rail network.**
+**Real-time NSW train analytics platform with event-driven architecture, Redis-backed state management, and WebSocket push updates.**
 
-🔗 **[Live Demo](https://railvision-frontend.vercel.app)** (currently down due to free tier) &nbsp;|&nbsp; 📡 **[API Docs](https://railvision-backend.onrender.com/docs)**
+[Live Demo](https://railvision-dash.vercel.app) | [API Docs](https://railvision-app-jpl5c.ondigitalocean.app/docs)
 
 ---
 
@@ -12,21 +12,21 @@
 
 ## What it does
 
-RailVision pulls live departure data from the Transport for NSW (TfNSW) Open Data API every 60 seconds, stores it in a PostgreSQL database and presents real-time analytics on train performance across Sydney's rail network. Users can see upcoming departures from major stations within the Sydney Trains network with live delay status and track which lines are consistently delayed and explore delay patterns by hour and day through historical data collection.
+RailVision ingests live departure data from 31 Sydney train stations via the Transport for NSW API, processes it through a dedicated worker service, and serves real-time analytics through a FastAPI backend. The frontend receives instant updates via WebSocket — no polling required.
 
 ---
 
 ## Features
 
-- **Live departure board** - upcoming trains for all 32 stations with platform, destination, scheduled time, and real-time delay status
-- **Multi-station support** - through interactive map as primary navigation tool with click-to-select, alongside traditional dropdown/search tool
-- **Line performance rankings** - all T, L, and M lines ranked by average delay with on-time percentage
-- **Delay across week** - Day/hour heatmap showing peak disruption windows
-- **Delay by hour chart** - bar chart showing which hours of the day have the worst delays (Sydney local time)
-- **Network stats per station** - total trips recorded, average trips per day, duration of RailVision tracking, average delay, worst performing line, total lines tracked
-- **Background poller** - server continuously collects data every 60 seconds using APScheduler with dashboard auto-refresh
+- **Real-time departure board** — live trains with platform, destination, and delay status, pushed via WebSocket
+- **Interactive station map** — Leaflet map with 31 stations as primary navigation, markers sized by trip count and colored by delay severity
+- **Line performance rankings** — T, L, M, and S lines ranked by average delay with on-time percentage
+- **Delay heatmap** — day/hour grid showing peak disruption windows across the week
+- **Hourly delay chart** — bar chart of average delays by hour (Sydney local time)
+- **Per-station stats** — total trips, daily average, avg delay, worst line
 
 ---
+
 ## Screenshots
 
 ### Dashboard Overview
@@ -43,70 +43,84 @@ RailVision pulls live departure data from the Transport for NSW (TfNSW) Open Dat
 
 ---
 
+## Architecture
+
+```
+                    ┌─────────────────┐
+                    │   TfNSW API     │
+                    └────────┬────────┘
+                             │ polls every 15s
+                    ┌────────▼────────┐
+                    │     Worker      │  (standalone process)
+                    │  - httpx async  │
+                    │  - retry/backoff│
+                    │  - rate limit   │
+                    └───┬─────────┬───┘
+                        │         │
+              writes state    writes history
+                        │         │
+                  ┌─────▼──┐  ┌───▼──────────┐
+                  │ Redis  │  │  PostgreSQL   │
+                  │ (live) │  │  (analytics)  │
+                  └─────┬──┘  └───┬──────────┘
+            pub/sub │         │
+                  ┌─────▼─────────▼──┐
+                  │    API Server     │
+                  │  GET /live   ← Redis (sub-5ms)
+                  │  GET /analytics ← Postgres
+                  │  WS  /ws     ← Redis Pub/Sub
+                  └────────┬─────────┘
+                           │
+                  ┌────────▼────────┐
+                  │    Frontend     │
+                  │  React + Vite   │
+                  │  WebSocket live │
+                  └─────────────────┘
+```
+
+### Data flow
+
+**Write path (Worker):** TfNSW API → parse & deduplicate → batch upsert to Postgres → write current state to Redis hashes → publish change events to Redis Pub/Sub
+
+**Read path (API):** Live departures served from Redis (fast). Analytics queries served from Postgres (durable). WebSocket subscriptions receive push events from Redis Pub/Sub, filtered by station.
+
+**Frontend:** Connects via WebSocket on station select. Receives instant updates when the worker detects a state change (new trip, delay update). Falls back to REST polling if WebSocket disconnects.
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Backend | Python, FastAPI |
-| Database | PostgreSQL (Supabase), SQLite (local dev) |
-| ORM | SQLAlchemy |
+| Backend | Python, FastAPI, Uvicorn |
+| Worker | Standalone async process, httpx with retry/backoff |
+| Database | PostgreSQL (Supabase) |
+| Cache / State | Redis (DigitalOcean managed) |
+| Real-time | WebSocket (FastAPI) + Redis Pub/Sub |
+| ORM | SQLAlchemy 2.0, Alembic migrations |
 | Data processing | Pandas |
-| Scheduling | APScheduler |
-| Frontend | React, Vite, Recharts, Leaflet |
-| Deployment | Render (backend), Vercel (frontend) |
+| Observability | Prometheus metrics, structured logging |
+| Frontend | React 19, Vite, Recharts, Leaflet |
+| Deployment | DigitalOcean App Platform (API + Worker), Vercel (frontend) |
 | Data source | Transport for NSW Open Data API |
-
----
-
-## Architecture
-
-```
-TfNSW Open Data API
-        │
-        ▼
-  APScheduler (every 60s)
-  polls 32 stations concurrently
-        │
-        ▼
-  FastAPI Backend (Render)
-    ├── GET /departures/live/{stop_id}         → live API call, filtered to trains
-    ├── GET /analytics/worst-lines             → DB query, grouped by line
-    ├── GET /analytics/delays/by-hour          → DB query, grouped by hour (AEDT)
-    ├── GET /analytics/delays/by-day-hour      → DB query, day × hour heatmap
-    ├── GET /analytics/stations/summary        → per-station avg delay + worst line
-    └── POST to PostgreSQL (Supabase)
-              │
-              ▼
-        PostgreSQL DB
-        (unique constraint on line + scheduled time + stop_id)
-              │
-              ▼
-    React Frontend (Vercel)
-    ├── Interactive Leaflet map (32 stations, click to select)
-    ├── Live departure board (updates per selected station)
-    ├── Line performance ranking table
-    ├── Delay by hour bar chart
-    ├── Day × hour delay heatmap
-    └── Network statistics cards
-```
 
 ---
 
 ## Key Engineering Decisions
 
-**SQLite locally, PostgreSQL in production** - SQLAlchemy's ORM abstracts the DB layer so the same models and queries work in both environments with just a connection string swap. This keeps local development fast with zero setup while using a production-grade DB on Render.
+**CQRS with Redis + Postgres** — live departure reads are served from Redis hashes (sub-5ms), while analytics queries hit Postgres for durable historical data. This separates the read and write paths so the API stays fast regardless of ingestion load.
 
-**Unique constraint + upsert instead of naive inserts** - rather than inserting 40 rows every 60 seconds, each departure is uniquely identified by `(line, scheduled_time, stop_id)`. On conflict, the row is updated with the latest estimated time and delay. This keeps the dataset clean and the trip count meaningful.
+**Event-driven WebSocket push** — the worker computes a fingerprint (MD5 of delay + estimated + platform) for each trip. Only when the fingerprint changes does it publish to Redis Pub/Sub. The API subscribes and fans out to WebSocket clients filtered by station. This eliminates unnecessary network traffic — the frontend only receives meaningful updates.
 
-**Composite indexes on frequently queried columns** - added `(line, scheduled)` and `(stop_id, scheduled)` indexes to speed up analytics queries that filter and group on these columns.
+**Dedicated worker process** — ingestion runs as a separate DigitalOcean worker component with its own lifecycle. The API can restart, scale, or deploy independently without interrupting data collection. A Postgres advisory lock prevents duplicate polling if multiple worker instances start.
 
-**UTC storage, AEDT display** - all timestamps are stored in UTC in the DB. The by-hour analytics query applies a `+11 hours` interval offset in Postgres before extracting the hour, and the frontend calculates relative departure times from UTC directly.
+**Batch upsert with deduplication** — departures are uniquely identified by `(line, scheduled_time, stop_id)`. Before upserting, rows are deduplicated by conflict key with a quality scoring function (prefers rows with realtime data, estimated times, and platform info). This prevents Postgres cardinality violations and keeps the dataset clean.
 
-**Background poller over cron** - APScheduler runs inside the FastAPI process so no separate infrastructure is needed. UptimeRobot pings the server every 5 minutes to prevent Render's free tier from spinning down.
+**Resilient upstream integration** — TfNSW calls use httpx with explicit timeouts (5s connect, 10s read), jittered exponential backoff on failures, and rate limit detection (HTTP 429 + header inspection). On rate limit, the worker backs off exponentially up to 10 minutes.
 
-**Map as primary navigation instead of a dropdown** - rather than a standard select input, the interactive Leaflet map serves as the station selector. Clicking a station marker updates all analytics views for that station. This makes the spatial relationship between stations part of the UX so users can see which stations are close together and how their delay profiles compare geographically.
+**SQLite locally, PostgreSQL in production** — SQLAlchemy abstracts the DB layer so the same models work in both environments. Dialect-specific operations (upsert syntax, timezone functions) are handled with conditional branches.
 
-**Line allowlist filter over prefix matching** - train lines are filtered using a regex (`^[TLMS][0-9]$`) rather than simple prefix matching. This excludes bus routes like T80 or M10 that share prefixes with train lines, keeping analytics clean and limited to actual rail services.
+**Proper timestamp handling** — all timestamps stored as `TIMESTAMPTZ` in Postgres. Analytics queries use `timezone('Australia/Sydney', ...)` for correct local time conversion, handling both AEDT and AEST automatically.
 
 ---
 
@@ -116,17 +130,24 @@ TfNSW Open Data API
 - Python 3.12+
 - Node.js 20+
 - A [TfNSW Open Data](https://opendata.transport.nsw.gov.au/) API key
+- Redis (optional — falls back to Postgres for live data)
 
 ### Backend
 
 ```bash
 cd backend
+python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 
-# create .env in backend directory
-echo "TFNSW_API_KEY=your_api_key_here" > .env
+# create .env
+echo "TFNSW_API_KEY=your_key_here" > .env
+# optional: REDIS_URL=redis://localhost:6379 DATABASE_URL=postgresql://...
 
+# run API server
 uvicorn main:app --reload
+
+# run worker (separate terminal)
+python worker.py
 ```
 
 ### Frontend
@@ -137,18 +158,14 @@ npm install
 npm run dev
 ```
 
-Then open `http://localhost:5173`. The frontend will use your local backend at `http://localhost:8000` (update the `API` constant in `App.jsx` if needed).
+Open `http://localhost:5173`. Update the `API` constant in `App.jsx` to point to your local backend if needed.
 
----
+### Tests
 
-## Future Improvements
-
-- **WebSockets** - replace polling with a persistent connection for true real-time updates
-- **Week-on-week comparisons** - track whether delays are getting better or worse over time
-- **Alerting** - notify users when a specific line is running significantly behind
-- **Filters** - additional filters to see historical data for past day, week etc.
-- **Mobile responsive UI** - optimise the dashboard layout for smaller screens
-- **Status history** - track delay trends per station over rolling 7 and 30 day windows
+```bash
+cd backend
+pytest tests/ -v
+```
 
 ---
 
