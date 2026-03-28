@@ -1,4 +1,3 @@
-from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
@@ -9,43 +8,9 @@ from models import Departure
 from schemas import DepartureOut
 from typing import Optional
 from datetime import datetime, timezone, timedelta
-import asyncio
-import os
-import logging
 
 
-logger = logging.getLogger(__name__)
-
-
-def _env_bool(name: str, default: bool) -> bool:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
-
-
-async def _poll_loop():
-    """Run the worker polling loop as a background asyncio task."""
-    from worker import poll_all_stations, POLL_INTERVAL
-    await asyncio.sleep(10)  # let the app finish startup before first poll
-    while True:
-        await poll_all_stations()
-        await asyncio.sleep(POLL_INTERVAL)
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    if not _env_bool("RUN_POLLER", True):
-        logger.info("RUN_POLLER=false; startup poll loop disabled for this process")
-        yield
-        return
-
-    task = asyncio.create_task(_poll_loop())
-    yield
-    task.cancel()
-
-
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,

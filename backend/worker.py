@@ -14,6 +14,7 @@ import os
 from sqlalchemy import text
 from services import get_departures
 from database import engine
+import redis_state
 
 logging.basicConfig(
     level=logging.INFO,
@@ -108,8 +109,12 @@ async def poll_all_stations() -> None:
     try:
         for name, stop_id in STATIONS.items():
             try:
-                await get_departures(stop_id)
+                departures = await get_departures(stop_id)
                 _rate_limit_backoff = 60  # reset on success
+
+                # Write current state to Redis + publish changes
+                if departures:
+                    await redis_state.update_trips(stop_id, departures)
             except Exception as e:
                 msg = str(e)
                 if "RATE_LIMITED" in msg:
@@ -141,4 +146,7 @@ async def _run() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(_run())
+    try:
+        asyncio.run(_run())
+    finally:
+        asyncio.run(redis_state.close())
